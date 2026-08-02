@@ -88,6 +88,89 @@ function pixelEllipse(ctx, cx, cy, rx, ry, color) {
   }
 }
 
+/* ---- how big a picture is, once it's just an array of row-strings.
+   Rows can be ragged (not all the same length) — a branch reaching
+   past the rest of the canopy, say — so this checks every row rather
+   than assuming the first one is the widest. ---------------------- */
+function gridSize(rows) {
+  let w = 0;
+  for (const r of rows) if (r.length > w) w = r.length;
+  return { w, h: rows.length };
+}
+
+/* ============================================================
+   THE COLOR SYSTEM
+   ------------------------------------------------------------
+   Approved Aug 2, alongside the sprites below. Every organic
+   picture (trees, bushes, hedges, the oak) and every "built"
+   picture (houses, fences, signs, roads, paths) is colored only
+   through these six roles — never a one-off hex value:
+
+     K outline   E deep shadow   D dark   M mid   L light   S spark
+
+   Which hex each role points to changes with a six-stage clock
+   that's meant to loosely track a real day. The exact colors for
+   all six stages are locked — copied verbatim below, not
+   re-picked. The hour each stage begins is *not* specified in the
+   approved notes, so I've set a plain, even schedule — that part
+   is easy to retune (just the STAGE_SCHEDULE hours) without
+   touching anything else.
+   ============================================================ */
+const PALETTE_STAGES = {
+  midnight:  { K: '#0a1026', E: '#04060f', D: '#1a2547', M: '#2e3f6e', L: '#55699c', S: '#a0b2d9' },
+  earlyDawn: { K: '#241631', E: '#100820', D: '#473060', M: '#6d4f8c', L: '#9c7fc0', S: '#ded0f0' },
+  morning:   { K: '#2c3f1e', E: '#17220e', D: '#5d7f3a', M: '#90b164', L: '#cbdb9e', S: '#f7f5dd' },
+  midday:    { K: '#234420', E: '#132a10', D: '#4a7a42', M: '#79ad6b', L: '#b9d9a6', S: '#f4f8e6' },
+  sunset:    { K: '#4a2410', E: '#2a1206', D: '#8a4a22', M: '#c07a3e', L: '#e8b078', S: '#fbeacb' },
+  night:     { K: '#0e1c22', E: '#060e12', D: '#23414b', M: '#3f6571', L: '#7096a1', S: '#b9d5db' }
+};
+
+/* The hour each stage begins, evenly spread across the day —
+   my assumption, not something the approved notes pinned down. */
+const STAGE_SCHEDULE = [
+  { hour: 0, stage: 'midnight' },
+  { hour: 4, stage: 'earlyDawn' },
+  { hour: 7, stage: 'morning' },
+  { hour: 10, stage: 'midday' },
+  { hour: 16, stage: 'sunset' },
+  { hour: 19, stage: 'night' }
+];
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function rgbToHex(r, g, b) {
+  const c = v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
+  return '#' + c(r) + c(g) + c(b);
+}
+function blendHex(a, b, t) {
+  const [ar, ag, ab] = hexToRgb(a), [br, bg, bb] = hexToRgb(b);
+  return rgbToHex(ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t);
+}
+
+/* Works out today's six-role palette from a real clock: which stage
+   it currently is, and how far into the fade toward the next one.
+   Runs once when the game loads, so the world reflects whatever
+   time of day it is when he opens the app that session — it doesn't
+   keep drifting while he's actively playing. (Making it drift live
+   is a nice next step, not done here.) */
+function computePalette(date) {
+  const hour = date.getHours() + date.getMinutes() / 60;
+  let idx = 0;
+  for (let i = 0; i < STAGE_SCHEDULE.length; i++) {
+    if (hour >= STAGE_SCHEDULE[i].hour) idx = i;
+  }
+  const cur = STAGE_SCHEDULE[idx];
+  const next = STAGE_SCHEDULE[(idx + 1) % STAGE_SCHEDULE.length];
+  const nextStart = next.hour > cur.hour ? next.hour : next.hour + 24;
+  const t = Math.max(0, Math.min(1, (hour - cur.hour) / (nextStart - cur.hour)));
+  const from = PALETTE_STAGES[cur.stage], to = PALETTE_STAGES[next.stage];
+  const roles = {};
+  ['K', 'E', 'D', 'M', 'L', 'S'].forEach(k => { roles[k] = blendHex(from[k], to[k], t); });
+  return roles;
+}
+
 /* ============================================================
    HIM
    ------------------------------------------------------------
@@ -340,28 +423,35 @@ function paintTile(ctx, w, h, base, specks, seed) {
   }
 }
 
-/* A blade-of-grass tuft or two, for the nicer grass tiles. */
-function paintGrass(ctx, seed) {
-  paintTile(ctx, 16, 16, '#6da84e', ['#5f9642', '#7cb95c'], seed);
-  const rnd = makeRng(seed + 99);
-  const tufts = pick(rnd, 0, 2);
-  for (let i = 0; i < tufts; i++) {
-    const x = pick(rnd, 2, 13), y = pick(rnd, 2, 12);
-    ctx.fillStyle = '#4f8437';
-    ctx.fillRect(x, y, 1, 3);
-    ctx.fillRect(x - 1, y + 1, 1, 2);
-    ctx.fillRect(x + 1, y + 1, 1, 2);
+/* Grass, per the approved recipe: an M base, a ~9% speckle of D
+   and L (roughly two D specks for every L one), and rare little
+   S "spark" crosses — about one per tile, on average. */
+function paintGrassRole(ctx, pal, seed) {
+  ctx.fillStyle = pal.M;
+  ctx.fillRect(0, 0, 16, 16);
+  const rnd = makeRng(seed);
+  const speckles = Math.round(16 * 16 * 0.09);
+  for (let i = 0; i < speckles; i++) {
+    ctx.fillStyle = rnd() < (2 / 3) ? pal.D : pal.L;
+    ctx.fillRect(pick(rnd, 0, 15), pick(rnd, 0, 15), 1, 1);
+  }
+  if (rnd() < 0.85) {
+    const x = pick(rnd, 2, 13), y = pick(rnd, 2, 13);
+    ctx.fillStyle = pal.S;
+    ctx.fillRect(x, y, 1, 1);
+    ctx.fillRect(x - 1, y, 1, 1); ctx.fillRect(x + 1, y, 1, 1);
+    ctx.fillRect(x, y - 1, 1, 1); ctx.fillRect(x, y + 1, 1, 1);
   }
 }
 
-function paintRoad(ctx, seed, withDash) {
-  paintTile(ctx, 16, 16, '#6a6a70', ['#5e5e64', '#76767c'], seed);
-  if (withDash) { ctx.fillStyle = '#d8c96a'; ctx.fillRect(4, 7, 8, 2); }
+function paintRoad(ctx, pal, seed, withDash) {
+  paintTile(ctx, 16, 16, pal.D, [pal.E, pal.M], seed);
+  if (withDash) { ctx.fillStyle = pal.S; ctx.fillRect(4, 7, 8, 2); }
 }
 
-function paintWalk(ctx, seed) {
-  paintTile(ctx, 16, 16, '#c3c1b3', ['#b4b2a4', '#d0cec1'], seed);
-  ctx.fillStyle = '#a9a79a';
+function paintWalk(ctx, pal, seed) {
+  paintTile(ctx, 16, 16, pal.L, [pal.M, pal.D], seed);
+  ctx.fillStyle = pal.D;
   ctx.fillRect(0, 0, 16, 1);
   ctx.fillRect(0, 0, 1, 16);
 }
@@ -369,8 +459,6 @@ function paintWalk(ctx, seed) {
 /* ============================================================
    FENCES  (16 x 16, made to tile seamlessly end to end)
    ============================================================ */
-const FENCE_PALETTE = { K: '#3a2a1a', W: '#ab8250', w: '#8b6839' };
-
 const FENCE_H = [
   '................',
   '................',
@@ -417,10 +505,6 @@ const FENCE_V = [
    brush-strokes on it, and the actual sentence appears in a little
    box at the bottom of the screen when he walks up to it.
    ============================================================ */
-const SIGN_PALETTE = {
-  K: '#2b1d11', W: '#cb9f63', w: '#a87d47', R: '#fbf3e2', P: '#8a6a45'
-};
-
 const SIGN_ROWS = [
   '..............................',
   '..............................',
@@ -450,10 +534,6 @@ const SIGN_ROWS = [
 ];
 
 /* The park's own entrance board — same idea, wider, one post. */
-const PARKSIGN_PALETTE = {
-  K: '#2b1d11', W: '#8a6a45', w: '#6d5334', R: '#f6ecd6', P: '#6d5334'
-};
-
 const PARKSIGN_ROWS = [
   '..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..',
   '..KWWWWWWWWWWWWWWWWWWWWWWWWWWK..',
@@ -473,124 +553,390 @@ const PARKSIGN_ROWS = [
 ];
 
 /* ============================================================
-   TREES
+   TREES, BUSH, PINE, HEDGE, THE BIG OAK
+   ------------------------------------------------------------
+   Approved Aug 2 — see APPROVED_SPRITES.md in the project notes.
+   Every one of these is a hand-placed letter grid, exactly like
+   him: copied verbatim below, one letter per pixel, never
+   redrawn from primitive shapes. Only the six-role palette they're
+   painted with changes; the shapes themselves are locked.
    ============================================================ */
-const TREE_STYLES = {
-  a: { r: 13, trunk: '#6b4a2b', dark: '#2c6329', mid: '#3d8434', lite: '#57a642', w: 32, h: 40 },
-  b: { r: 15, trunk: '#5e422a', dark: '#28582a', mid: '#377a33', lite: '#4d9a3d', w: 36, h: 46 },
-  c: { r: 11, trunk: '#75512f', dark: '#336b26', mid: '#458f31', lite: '#63b247', w: 28, h: 34 }
-};
+const TREE_C_ROWS = [
+  '...........KKKK',
+  '.........KKMLLMK',
+  '........KMLMLLLMKK',
+  '.......KMLLSLLMMMMK',
+  '......KMLMLLLMMLMMMK',
+  '....KKLLLMLMMMMMMMMK',
+  '....KMLMEELMMMMMMMMK',
+  '...KMMLMMEEMMMMDMMMMK',
+  '...KMMMLMMMMMDMMMMMMK',
+  '.KKLMMMMLMMMMMDMDMMMK',
+  '.KMMMLMMMMMMDMDMDMMMK',
+  '.KMMMMMMMMDMDDDDDDDMK',
+  '.KMDMMMMMDDDDDDDDDDMK',
+  '.KMDMDMMMDDDDDEDDDDK',
+  '..KMDMDMDDDDDDEEDDDK',
+  '..KMMDMDDDDDDDDEDDK',
+  '...KMDDDDDKDDDDDDK',
+  '....KKDDDKKKDDDDKK',
+  '......KKDK..KDDKK',
+  '........KK...KK',
+  '.........KEDDK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '.........KEDMK',
+  '........KEEDMMK',
+  '.......KEEDDMMMK',
+  '.......KKKKKKKK'
+];
 
-function drawRoundTree(ctx, style, seed) {
-  const s = TREE_STYLES[style];
-  const rnd = makeRng(seed);
-  const cx = Math.floor(s.w / 2);
-  const baseY = s.h - 2;
-  const trunkH = Math.floor(s.r * 0.9);
+const TREE_A_ROWS = [
+  '............KKKK',
+  '..........KKMLLMK',
+  '.........KMLMLLLMKK.KK',
+  '........KMLLLLSLLMKKMMKK',
+  '........KMLLMLLLLMMMMMMMK',
+  '.......KMLLLLLMLMMMLMMMMMK',
+  '.....KKLMLLLLLMMMMMMMMMMKK',
+  '.....KMMLMEELMMMMMMMMMMMMK',
+  '....KMMLMMMEEMMMMMMMDMMMMMK',
+  '...KMMMMLMMMMMMMMMDMMMMMMMMK',
+  '..KMLMMMMMMMMMMMMMMDMDMMMMK',
+  '.KMMMLLMMMMMMMMMMDMDMDMDMMMK',
+  '.KMLMLMMMMMMMMMDMDDDDDDDMMMK',
+  '.KMMMMMMMDMMMMMDDDDDDDDDDMMK',
+  '..KMMDMMMMMMMDDDDDDDDDDDDMMK',
+  '.KMMDMDMMMMMDDDDDDDDDDEDDDMK',
+  '.KMMMDMDMMMDDDDDDDDDDDDDDDK',
+  '..KMMDMDMDDDDDDDDDEDDDDDDDK',
+  '..KMMMDMDDDDDDDDDEEDDDDDDK',
+  '...KMDDDDDDDDDDDDDEDDDDDK',
+  '....KDDDDDDDKDDDDDDDDDDK',
+  '.....KKDDDDKKKDDDDDDDKK',
+  '.......KKDDK...KDDDKK',
+  '.........KKK....KKK',
+  '............KEDDK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '............KEDDMK',
+  '...........KEEDDMMK',
+  '..........KEEDDDMMMK',
+  '..........KKKKKKKKKK'
+];
 
-  // trunk first, so the leaves sit on top of it
-  ctx.fillStyle = s.trunk;
-  ctx.fillRect(cx - 3, baseY - trunkH, 6, trunkH);
-  ctx.fillStyle = '#4a341e';
-  ctx.fillRect(cx - 3, baseY - trunkH, 2, trunkH);
+const TREE_B_ROWS = [
+  '..............KKKKK',
+  '............KKMLLLMK',
+  '...........KMLMLLLLMKKK',
+  '.........KKMLLLLSLLMKKMKK',
+  '........KMLLLMLLLLLMMMMMMK',
+  '.......KMLLLLLLLMLMMMLMMMMK',
+  '......KMLMLLLLLLMMMMMMMMMMMK',
+  '.....KMLLLMEELLMMMMMMMMMMMMK',
+  '....KMMLLMMMEEMMMMMMMMMMMMMMK',
+  '...KMMMLMLMMMMMMMMMMMDMMMMMMMK',
+  '...KMLMMMMLMMMMMMMMMDMMMMMMMMK',
+  '.KKMMLLMMMMMMMMMMMMMMDMDMMMMMK',
+  '.KMLMLMMMMMMMMMMMMDMDMDMDMMMMK',
+  '.KMMMMMMMMMMMMMMDMDDDDDDDDMMMK',
+  '.KMMMMMMDMMMMMMMDDDDDDDDDDDMMMK',
+  '.KMMDMMMMMMMMMMDDDDDDDDDDDDDMMK',
+  '.KMDMDMMMMMMMMDDDDDDDDDDEDDDDMK',
+  '.KMMDMDMMMMMMDDDDDDDDDDDDDDDDMK',
+  '..KMDMDMMMMMDDDDDDDDDDDDDDDDDK',
+  '..KMMDMDMMMDDDDDDDDDDDDDDDDDDK',
+  '...KMMDMDMDDDDDDDDEEDDDDDDDDK',
+  '....KMDDDDDDDDDDDDDEEDDDDDDK',
+  '.....KDDDDDDDDKDDDDDEDDDDDK',
+  '......KKDDDDDKKKDDDDDDDDKK',
+  '........KKDDDK..KKDDDDKK',
+  '..........KKK.....KKKK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '..............KEDDMK',
+  '.............KEEDDMMK',
+  '............KEEDDDMMMK',
+  '............KKKKKKKKKK'
+];
 
-  // canopy: a few overlapping blobs so no two trees match exactly
-  const cy = baseY - trunkH - s.r + 3;
-  pixelCircle(ctx, cx, cy, s.r, s.dark);
-  pixelCircle(ctx, cx - pick(rnd, 1, 4), cy + 2, s.r - 2, s.mid);
-  pixelCircle(ctx, cx + pick(rnd, 1, 4), cy - 1, s.r - 3, s.mid);
-  pixelCircle(ctx, cx - 3, cy - 3, Math.max(3, s.r - 6), s.lite);
-  pixelCircle(ctx, cx + pick(rnd, 2, 5), cy + pick(rnd, 1, 3), 3, s.lite);
-}
+const PINE_ROWS = [
+  '............KK',
+  '...........KLMK',
+  '...........KLMDK',
+  '..........KLMMDK',
+  '..........KLMDDDK',
+  '.........KLMMDDDK',
+  '.........KMMDDDDDK',
+  '........KLMMDDDDDK',
+  '.......KLMMMDDDDDDK',
+  '......KLMMMDDDDDDDDK',
+  '........KMMDDDDDK',
+  '.......KLMMDDDDDDK',
+  '......KLMMMDDDDDDDK',
+  '.....KLMMMDDDDDDDDDK',
+  '....KLMMMMDDDDDDDDDDK',
+  '...KLMMMMDDDDDDDDDDDDK',
+  '......KLMMDDDDDDK',
+  '.....KLMMMDDDDDDDK',
+  '....KLMMMDDDDDDDDDK',
+  '...KLMMMMDDDDDDDDDDK',
+  '..KLMMMMMDDDDDDDDDDDK',
+  '.KLMMMMMMDDDDDDDDDDDDK',
+  'KLMMMMMMMDDEDDDDDDDDDDK',
+  '.KKKKKKKKKKEDDKKKKKKKK',
+  '..........KEDDK',
+  '..........KEDDK',
+  '..........KEDDK',
+  '..........KEDDK',
+  '.........KEEDDDK',
+  '.........KKKKKK'
+];
 
-function drawPine(ctx, w, h) {
-  const cx = Math.floor(w / 2);
-  ctx.fillStyle = '#5e422a';
-  ctx.fillRect(cx - 2, h - 9, 4, 8);
-  const tiers = 3;
-  for (let t = 0; t < tiers; t++) {
-    const top = 3 + t * Math.floor((h - 14) / tiers);
-    const bot = top + Math.floor((h - 14) / tiers) + 5;
-    for (let y = top; y < bot; y++) {
-      const half = Math.floor(((y - top) / (bot - top)) * (4 + t * 4)) + 2;
-      ctx.fillStyle = (y - top) < 2 ? '#4d9a3d' : '#2c6b2c';
-      ctx.fillRect(cx - half, y, half * 2, 1);
-    }
-  }
-}
+const BUSH_ROWS = [
+  '......KKKK....KKK',
+  '....KKMLLMKKKKMLMKK',
+  '...KMLMLLLMMMMLLMMK',
+  '..KMLLLSLLMLMMMLMMMK',
+  '.KMLLMLLMMMMEMMMMDMK',
+  '.KMLLLMMLMMEMMMDMDMMK',
+  'KMLMLMMMMMMMMDMDMDMMK',
+  'KMMMMLMMMMMDDDDDDDMMK',
+  'KMMMMMMMDMDDDDDDDDDMK',
+  'KMDMMMMMMDDDDDDEDDDK',
+  '.KMDMDMMDDDDDDEEDDDK',
+  '.KKMDMDDDDDDDDDEDDKK',
+  '...KKDDDDKDDDDDKK',
+  '.....KKKKKKKKKK'
+];
 
-function drawBush(ctx, w, h, seed) {
-  const rnd = makeRng(seed);
-  const cx = Math.floor(w / 2), cy = h - 8;
-  pixelCircle(ctx, cx, cy, 7, '#2c6329');
-  pixelCircle(ctx, cx - 4, cy + 1, 5, '#3d8434');
-  pixelCircle(ctx, cx + 4, cy + 1, 5, '#3d8434');
-  pixelCircle(ctx, cx - 2, cy - 3, 3, '#57a642');
-  if (rnd() < 0.5) { pixelCircle(ctx, cx + 3, cy - 2, 2, '#57a642'); }
-}
+/* 16x16, tiles seamlessly — repeats as a hedge boundary. */
+const HEDGE_ROWS = [
+  'MLLLMMDMLLLMMDML',
+  'LLLLLMDLLLLLMDLL',
+  'MLLLMMDMLLLMMDML',
+  'MMLMMDMMMLMMDMML',
+  'DMMMDMMDMMMDMMDM',
+  'MLLMMDMLLLMMDMLL',
+  'LLLLMDMLLLLMDMLL',
+  'MLLMMDMMLLMMDMML',
+  'MMMDMMDMMMDMMDMM',
+  'MDMMMDMMDMMMDMMD',
+  'MMDMDMMMMDMDMMMM',
+  'DMMMDMDMDMMMDMDM',
+  'MDDMDDMDDMDDMDDM',
+  'DDDDDDDDDDDDDDDD',
+  'EDEDDEDEEDEDDEDE',
+  'EEEEEEEEEEEEEEEE'
+];
 
 /* ---- THE BIG OAK -------------------------------------------
-   Harmon Park's landmark. Roughly three ordinary trees wide.
-   The dark oval at the base of the trunk is the hollow he'll
-   eventually be able to climb into — for now it's just a hint. */
-const OAK_W = 124, OAK_H = 152;
-
-function drawBigOak(ctx, w, h) {
-  const cx = Math.floor(w / 2);
-  const baseY = h - 2;
-  const trunkH = 40;
-
-  // wide, gnarled trunk
-  ctx.fillStyle = '#6b4a2b';
-  ctx.fillRect(cx - 11, baseY - trunkH, 22, trunkH);
-  ctx.fillStyle = '#57391f';
-  ctx.fillRect(cx - 11, baseY - trunkH, 5, trunkH);
-  ctx.fillRect(cx + 6, baseY - trunkH, 4, trunkH);
-  ctx.fillStyle = '#7d5934';
-  ctx.fillRect(cx - 5, baseY - trunkH, 3, trunkH);
-  // roots flaring out
-  ctx.fillStyle = '#6b4a2b';
-  ctx.fillRect(cx - 17, baseY - 7, 7, 7);
-  ctx.fillRect(cx + 10, baseY - 7, 7, 7);
-  ctx.fillRect(cx - 21, baseY - 4, 5, 4);
-  ctx.fillRect(cx + 16, baseY - 4, 5, 4);
-  // the hollow at the base — someday he'll climb in here
-  pixelCircle(ctx, cx, baseY - 12, 7, '#2e1d10');
-  pixelCircle(ctx, cx, baseY - 11, 5, '#160d07');
-  // two big lower branches reaching out
-  ctx.fillStyle = '#6b4a2b';
-  ctx.fillRect(cx - 27, baseY - trunkH - 5, 20, 7);
-  ctx.fillRect(cx + 7, baseY - trunkH - 5, 20, 7);
-  ctx.fillRect(cx - 31, baseY - trunkH - 11, 7, 8);
-  ctx.fillRect(cx + 25, baseY - trunkH - 11, 7, 8);
-
-  // canopy — layered blobs, darkest at the back
-  const cy = baseY - trunkH - 36;
-  pixelCircle(ctx, cx, cy, 38, '#255a24');
-  pixelCircle(ctx, cx - 30, cy + 12, 24, '#255a24');
-  pixelCircle(ctx, cx + 30, cy + 12, 24, '#255a24');
-  pixelCircle(ctx, cx - 20, cy + 6, 22, '#347331');
-  pixelCircle(ctx, cx + 20, cy + 5, 22, '#347331');
-  pixelCircle(ctx, cx, cy - 6, 27, '#347331');
-  pixelCircle(ctx, cx - 12, cy - 14, 15, '#4a9440');
-  pixelCircle(ctx, cx + 14, cy - 9, 12, '#4a9440');
-  pixelCircle(ctx, cx - 29, cy + 4, 9, '#4a9440');
-  pixelCircle(ctx, cx + 3, cy + 18, 10, '#4a9440');
-  pixelCircle(ctx, cx + 28, cy + 14, 8, '#4a9440');
-  pixelCircle(ctx, cx - 6, cy - 22, 7, '#5fae4e');
-}
+   Harmon Park's landmark, 124 wide by 152 tall — by far the
+   biggest hand-placed grid in the game. The hollow ringed in K
+   and E near the base is the future tree-climb entrance. */
+const OAK_ROWS = [
+  '.',
+  '.',
+  '....................................KKKK',
+  '...................................KLLLLK',
+  '..................................KLLLLLLK',
+  '.................................KLLLLLLLLK',
+  '............................KKKKKLLLLLLLLLLK',
+  '.........................KKKLLLLLLLLLLLLLMLMKK.....................KKK..........KKK',
+  '.......................KKLLLLLLLLLLLLLLMLMLMLKKKK..............KKKLMLK.......KKMMMKK',
+  '.....................KKLLMLLLLLLLLLLLLMLMLMLMLMMMK...........KKLLLMMMLK.....KMMMMMMMKK',
+  '....................KLLLLLLLLLMLLLLLLMLMLMLMLMMMMMK.......KKKLLLLMLDLMLK...KMMMMMMMMMMKKKKKKK',
+  '...................KLLLLLLLLLLLLLLLLMLMLMLMLMMMMMMMKKKKKKKLLLLLLMLMLMLMLKKKMMMMMMMMMMMMMMMMMMK',
+  '..................KLLLLLLLLLLLLLLLLMLMLMLMMMMMMMMMMLLLLLLLLLLLLMLMLMLMMMMKMLMDMMMMMMMMMDMMDMMMK',
+  '.................KLLLLLLLLLLLLLLLLMLMLMMMMMMMMMMMMMLLLLLLLLLLLMLMLMLMLMDMKMMMMMMMMMMMMMMMMMMMMK',
+  '.................KLLLLLLLLLLLLLLLMLMLMMMMMMMMMMMMLMLLLLLLLLLLMLMLMLMMMMMMDMMMMMMMMMMMMLMMMMMMMMK',
+  '.................KLLLLLLLLLLLLMLMLMLMMMMMMMDMMMMMMMLLLLLLLLLMLMLMLDMMMMMMMMMMMMMMMMMMMMMMMMMMMMK',
+  '.................KLLLLLLLLLLLMSMLMLMMMMMMMMMMMMMDMMLLLMLLLLMLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMK',
+  '.................KLLLLLLLLLLMLMLMLMMMMMMMMMMMMMMMMMMLLLLLLMLMLMLMMDMMDMMMMMMMMMMMMMMMMMMMMMMMLMMKKKKKKKKK',
+  '.................KLLLLLLLLLMLMLMLMMMMMMMDMMMMMMMMMMLLLLMMLMLMLMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMKK',
+  '.................KLLLLLLLLMLMLMMMMMMMMMMMMMMMMMMMMMMMLMLMLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMK',
+  '.................KLLLLLLLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMLMLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMK',
+  '.................KLLLLLLMLMLMDMMMMMMMMMMDMMMMMMMMMDMMLMLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMK',
+  '................KLLLLLLLLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMLMLMLMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMDMDMMMMMMMMMK',
+  '................KLLLLLMLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMLMLMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMK',
+  '...............KLLLLLMLMLMLMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDK',
+  '...............KLLLLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMK',
+  '...............KLLLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDK',
+  '................KLMLMLMMMMMMMMMDMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMLMMMMMLMDMDMDMK',
+  '.................KLMLMLMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDK',
+  '..................KLDMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMLMMMMMMMMMMMMMDMMMMDDMDMDMDDK',
+  '...................KLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMDMDMDMDDDK',
+  '...................KMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMDMDMDMDMMDDDDK',
+  '...................KMMMMMMMDMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMLMMMMMMMMMMMMMMDMDMDMDMDDDDDDK',
+  '...................KMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMDMDLDMDDDDDDDDK',
+  '...............KKKKMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDK',
+  '..............KLLLLMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMDMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDMDDDDK',
+  '.............KLLLLLMMMMMMMMMEEEMMMEEMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMDMMMDMDMDMDDDDDDDDDDDDK',
+  '............KLLLLLLMMMMMMMMMMMMEEEMMMMMMMMMDMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDK',
+  '..........KKLLLMLLLLMMMMMMMMMMMMMMMMMMMMMMDMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDDDDDDDDDDDDDDDK',
+  '........KKLLLMLLLMLLLMMMMMMMMMMMMMMMMMMDMDMDMMMMLMMMMMMMMMMMMMMMMMMMDLMMMMMMMMMMMMMMDMMMMDMDMDMDMDDDDDDDDDDDDKK',
+  '.......KLLLLLLLLLLLMLLMMMMMMMMMMMMMMMMDMDMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDDDMDMDMDDDDDDDDDDDMMMK',
+  '......KLLLLLLLMMLLMLMLMMMMMMMMMMMMMMMDMDMDMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMDMDMDMDDDDDDDDDDDDMMDMMK',
+  '......KMLLLLLLLLLDLMLMLMMMMMMMMMMMMMDMDMDMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDMMMMMMK',
+  '......KLLLLLLLLLMLMLMLMLMMMMMMMMMMMDMDMDMDDDMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMDMMMMMMMMMDMDDDDDDDDDDDDDDDDDMMLMDMMKK',
+  '......KLLLLLLMLMLMLMMMMMMMMMMMMMMMDMDMDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMMMELEMMMMMDMDMMMMMDMDDDDDDDDDDDDDDMMMMMMMMLMMKKK',
+  '......KLLLLLMLMLMLMMMDMMMMMMMMMMMDMDMDDDMMMMMMMMLMMMMLMMMMMMMMMMMMMMMMMMMEEEMMMDMDMDMDMDMDDDDMMMMLMMMMMMMMMMMMMMMMMMK',
+  '......KLLLLLLMLMLMMMMMMMMMMMMMMMMMDMDDMMMMMMEEEMMMEEEMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDMDMDDDDMMMMDMMMMMMMMMDMMMMMMMMMMK',
+  '.......KLLLMMLMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMEEEMMMEMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDMDMDDDDMMMMMMMMMMMMMMMMMMMMMDMMMMMK',
+  '.......KLLLMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMDMDMDMDMMMDMDDDDDDMMMMMMMMMMMMMMLMMMMMMMMMMMMMK',
+  '.......KLLLLMLMMMMMMMDMDMMMMMMMDMMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDDDMDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMMDMDK',
+  '.......KLLLMLMMMMMMMMMMMMMMMMMMMLMMMMMMMMMMMMMMMLMMMMMMMMMMMMMMMMMMMDMDMDMDMDMDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMDMMDMDMK',
+  '.......KLLMLMLMMMMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDMDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMK',
+  '.......KLMLMLMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDDMMLMMMMMMMMMMMMMMMMMMMMMDMDMDMDDK',
+  '......KLMLMLMMDMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMDMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDDDMMMMMMMMMMMMMMDMMMMMMMMDMDMDMDDDDK',
+  '......KMLMLMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMDMMMMMMDMDMDMDDDDDDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMDMDMDMDDDDDDK',
+  '.....KMLMLMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMDMMMLMMMMMMMMLDMDMDMDDDDDDDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMDMDMDMDDDDDDDK',
+  '....KMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMDMDMDMDDMMDDDDDK',
+  '....KMMMDMMMMMLMMMMMMMMMMMMMMMMDMMMDMDMMMMMMMMMMMDMMMMMMMMMMMDMDMDMMMDDDDDDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDK',
+  '...KMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMMMMDMMMMMMMMMMMMMMEEEMDMEEDMDMDDDDDDDDDDDDDDDMMDMMMMMMMMMMMMMMMDMMMMDMDMDMDDDDDDDDDDDK',
+  '...KMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDMMMMMMMMMMMMMMMMMMMMMMMEEEMDMDMDDDDMDMDDDDMMMMMMMMMMMMMMMMMMMMMMMMDDMDMDMDMDDDDDDDDDDDDK',
+  '....KMMMMMMMMMMMEEEMMMMMMMMMDLDMDMDMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDDK',
+  '.....KMMMMMMMMMMMDMEEEMMMMMDMDMDMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDDDK',
+  '......KMMMMMMMMMMMMMMMMMMMDMDMDMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDDDDK',
+  '......KMMMMMMMMMMMMMMMMMMDMDMDMMMLMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDDDDK',
+  '......KMMMMMMMMMMMMMMMMMDDDDDDMMMMMMMMMMMMMMMMMMMMMMMMDMDMMMMDDDDDDDDDDDDDMMMMMMMMDMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDDDDK',
+  '......KMMMMMMMMMMMMMMMMDMDDDDDMMMMMMMDMMMMMMMMMMMMMMMDDDMMMMMMDDDDDDDDDDDDMMMMMMMMMMMMMMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDMDKK',
+  '......KMMMMMMMMMMMMMMMDMDMDDMMMMMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMDDDDDMDDDMMMMMMMMMMMMMMMMMMMMMMMDMDDDDDDDDDDDDDDDDDDDKK',
+  '......KMMMMMMMMMMMMMMDMDMDDMMMMMDMMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMDMDDDDDDDDDDDDDDDDDK',
+  '.......KMMMMMMMMMMMMDMDMDDMMMMMMMMMMMMMMDMMMMMMMMMDMMMMMMMMMMMMMMMMMMLMMMMMMMMMMMMMMMMMMMMMMDMMMMMDDDDDDDDDDDDDDDDDDK',
+  '.......KMMMMMMMMMMMDMDMDDDMMMMMMMMMMMMMMMMDMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMMMMMMMMMMMMMMMMMDDDDDDDMDDDDDDDDDDK',
+  '........KKKMMMMMDMDMDMDMDMMMMMMMMMMMMMMMMMDMMMMMMMMMDMMMLMMMMMMMMMMMMMMMMMMMMMMMMMMMMLMMMMMMMMMMDMDDDDDDDDDDDDDDDDK',
+  '...........KKMMDMDMDMDDDMMMMMMMMMMMMMMMMMMMMMMMMDMMDMMMMMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMDDDDDDDDDKKKKK',
+  '.............KDMDMDMDDDMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMMMMMMMMMMMMMMMMMMMMMMDMDMMMMMMMMMMMMLMDMDMDMDDDDDDDDDDDK',
+  '..............KDMDMDDDDMMMMMMMMMMMMDMMMMMMMMMMMMMDMDMMMMMMMDMMMMLMMMMMMMMMMMMMMMMMMMMMMMMMMDMDDDMDDDDDDDDDDDDK',
+  '...............KKMDDDDMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDMMMMMMMMMMMMDMMMMMMMMDMMMMMMMMMMMMMMMDMDMDMDDDDDDDDDDDDK',
+  '.................KKDDMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMDMDMDMDDDDDDDDDDDDK',
+  '...................KKMMMMMMMMMDMMMMMMMMMMMMMDMDMDMDMMMMMMMMMMMMMMMMMMMMLDMDMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDDDK',
+  '.....................KMMMMMMMMMMMMMMMMMMMMMDMDMDMDMMMMMMMMMMMMMMMMMMMMMDMDMMMMMMMMMMMDMDMDMDMDDDDDDDDDDDDDK',
+  '.....................KKDMMMMMMMMMMMMMMMMMMDMDMMMDDDMMMMMMMDMMMMMMMMMDMDMDMMMMMMMMMMMMMDMDMDMDDDDDDDDDDDDDK',
+  '.....................KMMMMMMMMDMMMMMMMMMMDMDMDDDDDDMMMMMMMMMMMMMMMMDMDMDMDDMMMMMMMMMMDMDMDDDDDDDDDDDDDDDDK',
+  '.....................KMMLMMMMMMMMMMMMMMMDMDMDDDDDDDMMMMMMMMMMMDMMMDMDMDDDDDMMMMMMMDMDMDMDMDDDDDDDDDDDDDDDK',
+  '.....................KMMMMMMMMMMMMMMLMMDMDMDDDDDDDMMMMMMMMMMMMMMMDMDMMMDDDDDMMMDMDMDMDMDDDMDDDDDDDDDDDDDDDK',
+  '.....................KMMMMMMMMMMMMMMMMDMDMDDDDDDDMMMMMMMMMMDMMMMDMDMMMDDDDDDMMMMDMDMDMDDDDDDDMDDDDDDDDDDMDK',
+  '.....................KMMMMMMMDMMMMMMMDMDMDDDDDDDDMMMMMMMMMMMMMMDMDMDDDDDDDDDMMMDMDMDMDDDDDDDDDDDDDDDDDDDDDK',
+  '.....................KMMMMMMMMMMMMMMDMDMDDDDDDDDMMMMMMMMMMMMMMDMDMDDDDDDDDDDMMDMDMDMDDDDDDDDDDDDDDDDDDDDDDK',
+  '......................KMMMMMMMMMMMMDMDDDDDDDDDDDMMMMMLMMMMMMMDMDMDDDDDDDDDDDMMMDMDMDDDDDDDDDDDDDDDDDDDDDDDK',
+  '.......................KKKKMMMMMDMDMDMDDMDDDDDDDMMMMMMDMMMMMDLDMDDDDDMDDDDDDDMDMDMDDDDDDDDDDDDDDDDDDDDDDDK',
+  '.........................KDKMMMDMDMDMDDDDDDDDDDMMMMDMMMMMDMDMDDDDDDMDDDDMDDDMDMDMDDDDDDDDDDDDDDDDDDDDDDKK',
+  '.........................KDKMMDMDMDMMDDDDDDDDDDMMMMMMMMMDMDMDMDDDDDDDDDDDDDMDDDMDDDDDDDDDDDDDDDDDDDDKKK',
+  '.........................KDDKDMDMDMDDDDDDDDDDDMMMMMMMMMDMDMDMDDDDDDDDDDDDDDDMDMDDDDDDDDDDDDDDDDKDDKK',
+  '.........................KEDKMDMDMDDDDDMMDDDKMMMMMMMMMDMDMDMDDDDDDDDDDDDDDDMDMDDDDDDDDDDDDDDKKKEKK',
+  '..........................KEKDMDMMDDDDDDDDDKKKMMMMMMMDMDMDMDDDDDDDDDDDDDDDMDDDDDDDDDDDDDDDMKDEKK',
+  '...........................KKMDMDDDDDDDDDDK...KMMMMMDMDMDMDDDDDDDDDDDDDDDMMDDDDDDDDDDDDDDDKEEK',
+  '............................KDMDDDDDDDDDKKK....KMDMDMDMDMDDDDDDDDDDDDDDDKDDDDDDDDDDDDKKKKKEKK',
+  '.............................KKDDDDDDDKKDDKK....KMDMDLDMDDMDDDDDDDDDDDDKEKDDDDMDDDDKKDDDEEK',
+  '...............................KKDDDDKDDDDDDKK..KKMDMDMDDDDDDDDDDDDMDDKEEEKDDDDDDKKDDDEEKK',
+  '.................................KKKKEEDDDDDDDKKKEKMDDDDDDDDDDDDKKKKKKEEEEKDDDDDKDDDDEKK',
+  '.....................................KKEDDDDDDDDKKEKDDDDDDDDDDDKEEEEEEEEDEEKKKKKDDDEEK',
+  '.......................................KEEDDDDDDDDEEKDDDDDDDDDKEEEEEEEEMDDEDDDDDDEEKK',
+  '........................................KKEEDDDDDDDDEKDDMDDDDDKEEEEEEEMMMDDDDDDDEKK',
+  '..........................................KKEEDDDDDDDEKDDDDDDKEEDDDDMMMMDDDDDDEEK',
+  '............................................KKEEDDDDDEEKKDDKKEEDDDDDMMMMDDDDDEKK',
+  '..............................................KKEEDDDEEEEKKEEEEDDDDDMMMMDDDEEK',
+  '................................................KKEEDEEEEEEEEEDDDDDDMMMMDEEDK',
+  '.................................................KEEEEEEEEEEEDDDDDDMMMMMEDDK',
+  '.................................................KEEEEEDDEEDDDDDDDDMMMMMDDDK',
+  '................................................KEEEEEDDEDDDDDDDDDMMMMMDDDK',
+  '................................................KEEEEEDDEDDDDDDDDDMMMMMDDDK',
+  '................................................KEEEEEDDEDDDDDDDDDMMMMMDDDK',
+  '................................................KEEEEEDDEDDDDDDDDDMMMMMDDDK',
+  '.................................................KEEEEEDEDDDDDDDDDDMMMMMDDDK',
+  '.................................................KEEEEEDEDDDDDDDDDDMMMMMDDDK',
+  '..................................................KEEEEEEDDDDDDDDDEDMMMMMDDDK',
+  '..................................................KEEEEEEDDDDDDDDDEDMMMMMDDDK',
+  '..................................................KEEEEEEDDDDDDDDDEDMMMMMDDDK',
+  '..................................................KEEEEEEDDDDDDDDDEDMMMMMDDDK',
+  '.................................................KEEEEEDEDDDDDDDDDEMMMMMDDDK',
+  '.................................................KEEEEEDEDDDDDDDDDEMMMMMDDDK',
+  '................................................KEEEEEDDDDDDDDDDDDEMMMMDDDK',
+  '................................................KEEEEEDDDDDDDDDDDDEMMMMDDDK',
+  '................................................KEEEEEDDDDDDDDDDDDEMMMMDDDK',
+  '................................................KEEEEEDDDDDDDDDDDDEMMMMDDDK',
+  '................................................KEEEEEDDDDDDDDDDDDEMMMMDDDK',
+  '.................................................KEEEEEDDDDDDDDDDDEMMMMMDDDK',
+  '.................................................KEEEEEDDDDDEDDDDDEMMMMMDDDK',
+  '..................................................KEEEEEDDDDEDDDDDEDMMMMMDDDK',
+  '..................................................KEEEEEDDDDEDEDDDDDMMMMMDDDK',
+  '..................................................KEEEEEDDDEEEEEEEDDMMMMMDDDK',
+  '..................................................KEEEEEDEEEEEEEEEEEMMMMMDDDK',
+  '.................................................KEEEEEDEEEEEEKEEEEEEMMMDDDK',
+  '.................................................KEEEEEEEEEKKKKKKKEEEEMMDDDK',
+  '................................................KEEEEEDEEEKKKKKKKKKEEEMDDDK',
+  '................................................KEEEEEEEEKKKKKKKKKKKEEEDDDK',
+  '................................................KEEEEEEEEKKKKKKKKKKKEEEDDDK',
+  '................................................KEEEEEEEKKKKKKKKKKKKKEEDDDK',
+  '.................................................KEEEEEEKKKKKKKKKKKKKEEMDDDK',
+  '.................................................KEEEEEEKKKKKKKKKKKKKEEEDDDK',
+  '..................................................KEEEEEKKKKKKKKKKKKKEEMMDDDK',
+  '..................................................KEEEEEKKKKKKKKKKKKKEEMMDDDK',
+  '..................................................KEEEEEEKKKKKKKKKKKEEEMMDDDK',
+  '..................................................KEEEEEEKKKKKKKKKKKEEEMMDDDK',
+  '...............................................KKKEEEEEEEEKKKKKKKKKEEEMMDDDKKK',
+  '............................................KKKDDDEEEEEEEEEKKKKKKKEEEEMMDDDDDDKKK',
+  '.........................................KKKDDDDEEEEEDDDEEEEEEKEEEEEEMMMDDDKDDDDDKKK',
+  '......................................KKKDDDDDDDEEEEEDDDDEEEEEEEEEEEMMMMDDDDDDDDDDDDKKK',
+  '.....................................KDDDDDDDDDEEEEEEDDDDDDEEEEEEEDMMMMMMDDDDDDDDDDDDDDK',
+  '......................................KKKKDDDDEEEEEEDDDDDDDDDDEDDDDMMMMMMDDDDDDDDDDKKKK',
+  '..........................................KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
+  '.',
+  '.',
+  '.',
+  '.'
+];
 
 /* ============================================================
    HOUSES
+   ------------------------------------------------------------
+   The construction (shingle courses, staggered eaves, the door
+   and window layout) was already approved and stays exactly as
+   it was. What changes is that every color now comes from the
+   active six-role palette instead of its own private hex table —
+   which does mean the neighbours' houses no longer each have
+   their own signature color (a blue house, a green house...);
+   everything on screen shares one time-of-day family of color,
+   distinguished by size and shading rather than hue. That's a
+   real, visible change from before — flagging it clearly rather
+   than letting it slide by quietly.
    ============================================================ */
-function drawHouse(ctx, w, h, c) {
+function drawHouse(ctx, w, h, pal) {
   const roofH = Math.round(h * 0.46);
   const wallTop = roofH;
 
   // walls
-  ctx.fillStyle = c.wall;
+  ctx.fillStyle = pal.M;
   ctx.fillRect(2, wallTop, w - 4, h - wallTop);
-  ctx.fillStyle = c.wallDark;
+  ctx.fillStyle = pal.D;
   for (let y = wallTop + 3; y < h; y += 4) ctx.fillRect(2, y, w - 4, 1);
   ctx.fillRect(2, wallTop, 3, h - wallTop);
   ctx.fillRect(w - 5, wallTop, 3, h - wallTop);
@@ -598,32 +944,32 @@ function drawHouse(ctx, w, h, c) {
   // roof — narrower at the top, wider at the eaves
   for (let r = 0; r < roofH; r++) {
     const inset = Math.round((1 - r / roofH) * 6);
-    ctx.fillStyle = (r < 2) ? c.roofLite : (r % 4 === 3 ? c.roofDark : c.roof);
+    ctx.fillStyle = (r < 2) ? pal.L : (r % 4 === 3 ? pal.E : pal.D);
     ctx.fillRect(inset, r, w - inset * 2, 1);
   }
   // eaves shadow on the wall
-  ctx.fillStyle = c.roofDark;
+  ctx.fillStyle = pal.E;
   ctx.fillRect(0, roofH - 2, w, 2);
 
   // chimney — a short stack near the ridge, not a stripe down the roof
   const chH = Math.round(roofH * 0.5);
-  ctx.fillStyle = c.chimney;
+  ctx.fillStyle = pal.D;
   ctx.fillRect(w - 30, 1, 9, chH);
-  ctx.fillStyle = '#5d5048';
+  ctx.fillStyle = pal.E;
   ctx.fillRect(w - 32, 0, 13, 4);
   ctx.fillRect(w - 30, 1 + chH - 2, 9, 2);
 
   // door, centred at the bottom
   const dh = Math.min(30, h - wallTop - 4), dw = Math.round(dh * 0.62);
   const dx = Math.round(w / 2 - dw / 2), dy = h - dh;
-  ctx.fillStyle = c.trim;
+  ctx.fillStyle = pal.L;
   ctx.fillRect(dx - 2, dy - 2, dw + 4, dh + 2);
-  ctx.fillStyle = c.door;
+  ctx.fillStyle = pal.E;
   ctx.fillRect(dx, dy, dw, dh);
-  ctx.fillStyle = c.doorDark;
+  ctx.fillStyle = pal.K;
   ctx.fillRect(dx, dy, 3, dh);
   ctx.fillRect(dx, dy, dw, 2);
-  ctx.fillStyle = '#f2d98a';
+  ctx.fillStyle = pal.S;
   ctx.fillRect(dx + dw - 5, dy + Math.floor(dh / 2), 3, 3);
 
   // windows either side of the door
@@ -631,75 +977,59 @@ function drawHouse(ctx, w, h, c) {
   const winW = 20;
   const winY = wallTop + 6;
   [[7, winY], [w - winW - 7, winY]].forEach(p => {
-    ctx.fillStyle = c.trim;
+    ctx.fillStyle = pal.L;
     ctx.fillRect(p[0] - 2, p[1] - 2, winW + 4, winH + 4);
-    ctx.fillStyle = c.win;
+    ctx.fillStyle = pal.L;
     ctx.fillRect(p[0], p[1], winW, winH);
-    ctx.fillStyle = c.winLite;
+    ctx.fillStyle = pal.S;
     ctx.fillRect(p[0], p[1], Math.floor(winW / 2) - 1, Math.floor(winH / 2));
-    ctx.fillStyle = c.trim;
+    ctx.fillStyle = pal.D;
     ctx.fillRect(p[0] + Math.floor(winW / 2) - 1, p[1], 2, winH);
     ctx.fillRect(p[0], p[1] + Math.floor(winH / 2) - 1, winW, 2);
   });
 }
 
+/* Sizes only now — colors come from the active palette at draw
+   time. "main" is his own house; the rest are neighbours. */
 const HOUSE_STYLES = {
-  main:  { w: 208, h: 112, roof: '#8c4a3a', roofDark: '#6d3529', roofLite: '#a35b48',
-           wall: '#e8dcc0', wallDark: '#cfc1a2', door: '#4a6f8c', doorDark: '#37556e',
-           win: '#7fb6d8', winLite: '#bfe0f2', trim: '#f6eeda', chimney: '#7d6a5a' },
-  blue:  { w: 128, h: 88, roof: '#4a6f8c', roofDark: '#37556e', roofLite: '#5c85a4',
-           wall: '#dfe6ea', wallDark: '#c3ccd3', door: '#8c5a3a', doorDark: '#6b4229',
-           win: '#7fb6d8', winLite: '#bfe0f2', trim: '#f6f8fa', chimney: '#7d6a5a' },
-  green: { w: 128, h: 88, roof: '#4e6b3c', roofDark: '#3a512c', roofLite: '#60814b',
-           wall: '#efe3c4', wallDark: '#d4c7a6', door: '#7a4630', doorDark: '#5b3322',
-           win: '#7fb6d8', winLite: '#bfe0f2', trim: '#fbf5e4', chimney: '#8a7565' },
-  cream: { w: 128, h: 88, roof: '#7d6a5a', roofDark: '#5f4f42', roofLite: '#93806f',
-           wall: '#f0e4cb', wallDark: '#d6c9ac', door: '#5a6f4a', doorDark: '#425336',
-           win: '#7fb6d8', winLite: '#bfe0f2', trim: '#fbf6e8', chimney: '#7d6a5a' }
+  main:  { w: 208, h: 112 },
+  blue:  { w: 128, h: 88 },
+  green: { w: 128, h: 88 },
+  cream: { w: 128, h: 88 }
 };
 
 /* ---- odds and ends ----------------------------------------- */
-function drawMailbox(ctx, w, h) {
-  ctx.fillStyle = '#6b4a2b';
+function drawMailbox(ctx, w, h, pal) {
+  ctx.fillStyle = pal.D;
   ctx.fillRect(7, 8, 3, h - 9);
-  ctx.fillStyle = '#5a5a62';
+  ctx.fillStyle = pal.M;
   ctx.fillRect(2, 2, 13, 8);
-  ctx.fillStyle = '#767680';
+  ctx.fillStyle = pal.L;
   ctx.fillRect(2, 2, 13, 3);
-  ctx.fillStyle = '#b8433a';
+  ctx.fillStyle = pal.S;
   ctx.fillRect(14, 3, 2, 5);
 }
 
-function drawBench(ctx, w, h) {
-  ctx.fillStyle = '#a8814f';
+function drawBench(ctx, w, h, pal) {
+  ctx.fillStyle = pal.M;
   ctx.fillRect(1, 1, w - 2, 4);
   ctx.fillRect(1, 8, w - 2, 4);
-  ctx.fillStyle = '#8a6a3c';
+  ctx.fillStyle = pal.D;
   ctx.fillRect(1, 4, w - 2, 1);
   ctx.fillRect(1, 11, w - 2, 1);
-  ctx.fillStyle = '#5a5a62';
+  ctx.fillStyle = pal.K;
   ctx.fillRect(3, 12, 3, 5);
   ctx.fillRect(w - 6, 12, 3, 5);
 }
 
-function drawHedge(ctx, seed) {
-  paintTile(ctx, 16, 16, '#2f6b2c', ['#276024', '#3d8434'], seed);
-  const rnd = makeRng(seed + 7);
-  for (let i = 0; i < 6; i++) {
-    pixelCircle(ctx, pick(rnd, 2, 13), pick(rnd, 3, 12), 2, '#47883a');
-  }
-  ctx.fillStyle = '#1f4a1e';
-  ctx.fillRect(0, 14, 16, 2);
-}
-
-function drawStonePost(ctx, w, h) {
-  ctx.fillStyle = '#9a9186';
+function drawStonePost(ctx, w, h, pal) {
+  ctx.fillStyle = pal.M;
   ctx.fillRect(1, 2, w - 2, h - 3);
-  ctx.fillStyle = '#b0a89c';
+  ctx.fillStyle = pal.L;
   ctx.fillRect(1, 2, 4, h - 3);
-  ctx.fillStyle = '#7d7469';
+  ctx.fillStyle = pal.D;
   for (let y = 6; y < h; y += 5) ctx.fillRect(1, y, w - 2, 1);
-  ctx.fillStyle = '#b0a89c';
+  ctx.fillStyle = pal.L;
   ctx.fillRect(0, 0, w, 3);
 }
 
@@ -1091,7 +1421,15 @@ class PrairieScene extends Phaser.Scene {
 
   buildArt() {
     this.propSize = {};
-    const LEAF = '#1b3a17', WOOD = '#241a12', STONE = '#4a463f';
+
+    // Which of the six time-of-day looks is active right now —
+    // everything organic and everything "built" below is colored
+    // from this one palette. Hero and Henri deliberately are NOT:
+    // how they map onto the role system is still an open question
+    // (see the project's ILLUSTRATION_DIRECTION notes), so they
+    // keep their own fixed colors until that's decided.
+    this.palette = computePalette(new Date());
+    const pal = this.palette;
 
     /* ---- him ---- */
     const frames = heroFrames();
@@ -1117,47 +1455,42 @@ class PrairieScene extends Phaser.Scene {
     this.buildHenriArt();
 
     /* ---- the ground ---- */
+    // Fences, signposts, and the hedge all use letter grids too, so
+    // their "palettes" are just the six roles under different names.
+    const FENCE_PAL = { K: pal.K, W: pal.M, w: pal.D };
+    const SIGN_PAL = { K: pal.K, W: pal.M, w: pal.D, R: pal.L, P: pal.D };
+
     this.tileArt = {
-      grass: [0, 1, 2].map(i => this.smallCanvas(16, 16, c => paintGrass(c, 11 + i * 37))),
-      lawn: [0, 1].map(i => this.smallCanvas(16, 16, c => {
-        paintTile(c, 16, 16, '#78b455', ['#6aa649', '#88c266'], 3 + i * 19);
-      })),
-      road: [0, 1].map(i => this.smallCanvas(16, 16, c => paintRoad(c, 5 + i * 23, false))),
-      roadD: [this.smallCanvas(16, 16, c => paintRoad(c, 5, true))],
-      walk: [0, 1].map(i => this.smallCanvas(16, 16, c => paintWalk(c, 7 + i * 41))),
-      path: [0, 1].map(i => this.smallCanvas(16, 16, c => {
-        paintTile(c, 16, 16, '#cbbb96', ['#bbaa85', '#dacdae'], 13 + i * 29);
-      })),
-      conc: [0, 1].map(i => this.smallCanvas(16, 16, c => {
-        paintTile(c, 16, 16, '#c9c6bb', ['#bab7ab', '#d7d4ca'], 17 + i * 31);
-      })),
-      dirt: [0, 1].map(i => this.smallCanvas(16, 16, c => {
-        paintTile(c, 16, 16, '#b08a5a', ['#9b7748', '#c39c6a'], 23 + i * 43);
-      })),
-      hedge: [0, 1].map(i => this.smallCanvas(16, 16, c => drawHedge(c, 61 + i * 53)))
+      grass: [0, 1, 2].map(i => this.smallCanvas(16, 16, c => paintGrassRole(c, pal, 11 + i * 37))),
+      lawn: [0, 1].map(i => this.smallCanvas(16, 16, c => paintGrassRole(c, pal, 3 + i * 19))),
+      road: [0, 1].map(i => this.smallCanvas(16, 16, c => paintRoad(c, pal, 5 + i * 23, false))),
+      roadD: [this.smallCanvas(16, 16, c => paintRoad(c, pal, 5, true))],
+      walk: [0, 1].map(i => this.smallCanvas(16, 16, c => paintWalk(c, pal, 7 + i * 41))),
+      path: [0, 1].map(i => this.smallCanvas(16, 16, c => paintTile(c, 16, 16, pal.M, [pal.D, pal.L], 13 + i * 29))),
+      conc: [0, 1].map(i => this.smallCanvas(16, 16, c => paintTile(c, 16, 16, pal.L, [pal.M, pal.D], 17 + i * 31))),
+      dirt: [0, 1].map(i => this.smallCanvas(16, 16, c => paintTile(c, 16, 16, pal.D, [pal.E, pal.M], 23 + i * 43))),
+      hedge: [this.smallCanvas(16, 16, c => drawPixels(c, HEDGE_ROWS, pal))]
     };
 
     /* ---- everything that stands on the ground ---- */
-    ['a', 'b', 'c'].forEach((s, i) => {
-      const st = TREE_STYLES[s];
-      this.makeTexture('tree_' + s, st.w, st.h, c => drawRoundTree(c, s, 101 + i * 57), LEAF);
+    [['tree_a', TREE_A_ROWS], ['tree_b', TREE_B_ROWS], ['tree_c', TREE_C_ROWS],
+     ['pine', PINE_ROWS], ['bush', BUSH_ROWS], ['oak', OAK_ROWS]].forEach(([key, rows]) => {
+      const sz = gridSize(rows);
+      this.makeTexture(key, sz.w, sz.h, c => drawPixels(c, rows, pal));
     });
-    this.makeTexture('pine', 26, 40, c => drawPine(c, 26, 40), LEAF);
-    this.makeTexture('bush', 22, 20, c => drawBush(c, 22, 20, 5), LEAF);
-    this.makeTexture('oak', OAK_W, OAK_H, c => drawBigOak(c, OAK_W, OAK_H), '#14300f');
 
     Object.keys(HOUSE_STYLES).forEach(name => {
       const s = HOUSE_STYLES[name];
-      this.makeTexture('house_' + name, s.w, s.h, c => drawHouse(c, s.w, s.h, s), '#2b1d11');
+      this.makeTexture('house_' + name, s.w, s.h, c => drawHouse(c, s.w, s.h, pal), pal.K);
     });
 
-    this.makeTexture('fence_h', 16, 16, c => drawPixels(c, FENCE_H, FENCE_PALETTE));
-    this.makeTexture('fence_v', 16, 16, c => drawPixels(c, FENCE_V, FENCE_PALETTE));
-    this.makeTexture('sign', 30, 25, c => drawPixels(c, SIGN_ROWS, SIGN_PALETTE));
-    this.makeTexture('parksign', 32, 15, c => drawPixels(c, PARKSIGN_ROWS, PARKSIGN_PALETTE));
-    this.makeTexture('mailbox', 17, 17, c => drawMailbox(c, 17, 17), WOOD);
-    this.makeTexture('bench', 28, 18, c => drawBench(c, 28, 18), WOOD);
-    this.makeTexture('post', 14, 26, c => drawStonePost(c, 14, 26), STONE);
+    this.makeTexture('fence_h', 16, 16, c => drawPixels(c, FENCE_H, FENCE_PAL));
+    this.makeTexture('fence_v', 16, 16, c => drawPixels(c, FENCE_V, FENCE_PAL));
+    this.makeTexture('sign', 30, 25, c => drawPixels(c, SIGN_ROWS, SIGN_PAL));
+    this.makeTexture('parksign', 32, 15, c => drawPixels(c, PARKSIGN_ROWS, SIGN_PAL));
+    this.makeTexture('mailbox', 17, 17, c => drawMailbox(c, 17, 17, pal), pal.K);
+    this.makeTexture('bench', 28, 18, c => drawBench(c, 28, 18, pal), pal.K);
+    this.makeTexture('post', 14, 26, c => drawStonePost(c, 14, 26, pal), pal.K);
   }
 
   /* Henri gets his own small spritesheet: 9 frames (3 directions x
