@@ -1,16 +1,14 @@
 /* ============================================================
-   Prairie Village — Stage 0: Foundations  (revision 2)
+   Prairie Village — Stage 0: Foundations  (final)
    ------------------------------------------------------------
-   Changes in this revision:
-     - The action button is now the WHOLE right half of the screen.
-       Tap anywhere over there and it registers, with a little ripple
-       where your thumb landed.
-     - Trees and the fence now BLOCK you. You can't walk through them,
-       and you slide along them instead of sticking.
-     - You can walk *behind* a tree's leaves — it draws over you.
-     - New: a MOVE button in the top-right corner cycles between three
-       movement styles so you can feel the difference. Your choice is
-       remembered on this phone.
+   Settled during Stage 0:
+     - Landscape only.
+     - Thumb joystick appears wherever you touch the left half.
+     - The entire right half is the action button.
+     - Movement snaps to 8 directions. (Locked in — the old
+       FREE / 4-WAY toggle has been removed.)
+     - Trees and fences block you; you slide along them, and you can
+       tuck in behind a tree's leaves.
    ============================================================ */
 
 const TUNING = {
@@ -22,12 +20,8 @@ const TUNING = {
 const WORLD_W = 1600;
 const WORLD_H = 1200;
 
-// The three movement styles you're deciding between.
-const MOVE_MODES = [
-  { key: 'FREE',  label: 'FREE  (any angle)'  },
-  { key: 'EIGHT', label: '8-WAY (snaps to 8)' },
-  { key: 'FOUR',  label: '4-WAY (up/down/L/R)'},
-];
+// Movement snaps to the nearest of 8 compass directions.
+const SNAP_STEP = Math.PI / 4;
 
 class PrairieScene extends Phaser.Scene {
   constructor() { super('prairie'); }
@@ -38,10 +32,6 @@ class PrairieScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#5d8f42');
     this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
-
-    // remember the movement style between visits
-    const saved = window.localStorage.getItem('pv_move_mode');
-    this.moveModeIndex = Math.max(0, MOVE_MODES.findIndex(m => m.key === saved));
 
     this.buildWorld();
     this.buildPlayer();
@@ -167,54 +157,23 @@ class PrairieScene extends Phaser.Scene {
       color: '#ffffff', align: 'center'
     }).setOrigin(0.5).setAlpha(0.30).setScrollFactor(0).setDepth(D);
 
-    this.readout = this.add.text(10, 46, '', {
+    // Small dev readout. This goes away in Stage 7 (polish).
+    this.readout = this.add.text(10, 10, '', {
       fontFamily: 'monospace', fontSize: '13px', color: '#ffffff',
       backgroundColor: 'rgba(0,0,0,0.35)', padding: { x: 6, y: 4 }
     }).setScrollFactor(0).setDepth(D + 2);
-
-    // --- the movement-style toggle (temporary, just for this stage) ---
-    this.modeBtn = this.add.rectangle(0, 0, 172, 34, 0x000000, 0.45)
-      .setOrigin(1, 0).setScrollFactor(0).setDepth(D + 2);
-    this.modeBtn.setStrokeStyle(2, 0xffffff, 0.5);
-    this.modeLabel = this.add.text(0, 0, '', {
-      fontFamily: 'monospace', fontSize: '12px', color: '#ffffff'
-    }).setOrigin(1, 0).setScrollFactor(0).setDepth(D + 3);
-    this.refreshModeLabel();
   }
 
   layoutControls() {
     const w = this.scale.width, h = this.scale.height;
     this.actionHint.setPosition(w * 0.75, h * 0.62);
     this.readout.setPosition(10, 10);
-    this.modeBtn.setPosition(w - 10, 10);
-    this.modeLabel.setPosition(w - 20, 20);
-  }
-
-  refreshModeLabel() {
-    this.modeLabel.setText('MOVE: ' + MOVE_MODES[this.moveModeIndex].label);
-  }
-
-  cycleMoveMode() {
-    this.moveModeIndex = (this.moveModeIndex + 1) % MOVE_MODES.length;
-    window.localStorage.setItem('pv_move_mode', MOVE_MODES[this.moveModeIndex].key);
-    this.refreshModeLabel();
-    this.tweens.add({
-      targets: [this.modeBtn, this.modeLabel],
-      alpha: { from: 0.4, to: 1 }, duration: 180
-    });
   }
 
   // ---------------------------------------------------------
   // Touch input
   // ---------------------------------------------------------
   onDown(p) {
-    // The mode toggle sits on the right side, so check it first.
-    const b = this.modeBtn;
-    if (p.x >= b.x - b.width && p.x <= b.x && p.y >= b.y && p.y <= b.y + b.height) {
-      this.cycleMoveMode();
-      return;
-    }
-
     // RIGHT HALF = action, anywhere.
     if (p.x >= this.scale.width * 0.5) {
       this.pressAction(p.x, p.y);
@@ -276,17 +235,13 @@ class PrairieScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------
-  // Turn the raw stick into movement, in the chosen style
+  // Turn the raw thumb angle into one of 8 clean directions
   // ---------------------------------------------------------
   resolveDirection(vx, vy) {
-    const mode = MOVE_MODES[this.moveModeIndex].key;
     const mag = Math.min(1, Math.hypot(vx, vy));
     if (mag === 0) return { x: 0, y: 0 };
 
-    if (mode === 'FREE') return { x: vx, y: vy };
-
-    const step = (mode === 'EIGHT') ? Math.PI / 4 : Math.PI / 2;
-    const snapped = Math.round(Math.atan2(vy, vx) / step) * step;
+    const snapped = Math.round(Math.atan2(vy, vx) / SNAP_STEP) * SNAP_STEP;
     return { x: Math.cos(snapped) * mag, y: Math.sin(snapped) * mag };
   }
 
@@ -321,7 +276,6 @@ class PrairieScene extends Phaser.Scene {
     this.nose.setDepth(this.player.y + 0.1);
 
     this.readout.setText([
-      `mode    ${MOVE_MODES[this.moveModeIndex].key}`,
       `fps     ${Math.round(this.game.loop.actualFps)}`,
       `facing  ${this.facing}`,
       `taps    ${this.actionCount}`
