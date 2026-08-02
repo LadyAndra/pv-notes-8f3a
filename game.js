@@ -141,6 +141,11 @@ class PrairieScene extends Phaser.Scene {
     this.nose = this.add.rectangle(0, 0, 10, 5, 0x3a2c1e);
 
     this.physics.add.collider(this.player, this.blockers);
+
+    // The camera rides along with him, with a little smoothing so it
+    // eases rather than snapping. Without this you'd be staring at a
+    // fixed corner of the map while he walks off out of view.
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
   }
 
   // ---------------------------------------------------------
@@ -180,9 +185,9 @@ class PrairieScene extends Phaser.Scene {
   layoutControls() {
     const w = this.scale.width, h = this.scale.height;
     this.actionHint.setPosition(w * 0.75, h * 0.62);
-    this.readout.setPosition(10, 92);
-    this.modeBtn.setPosition(w - 10, 46);
-    this.modeLabel.setPosition(w - 20, 56);
+    this.readout.setPosition(10, 10);
+    this.modeBtn.setPosition(w - 10, 10);
+    this.modeLabel.setPosition(w - 20, 20);
   }
 
   refreshModeLabel() {
