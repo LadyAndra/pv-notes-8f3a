@@ -186,15 +186,24 @@ function computePalette(date) {
    T t-shirt black  t shirt shadow
    C cargo shorts   c shorts shadow
    N sandal         n sandal dark
-   ============================================================ */
-const HERO_PALETTE = {
-  K: '#241a12', S: '#f0c69c', s: '#d69f74',
-  H: '#6b4423', h: '#4a2e18',
-  P: '#7b4bbd', p: '#5a3690',
-  G: '#3a7fd8', g: '#c3e6fa',
-  T: '#2a2a30', t: '#191920',
-  C: '#9d8a5e', c: '#7c6c47',
-  N: '#8a6a45', n: '#5c4630'
+
+   Resolved Aug 2: he's colored through the same six roles as
+   everything else now, rather than his own 14 literal colors.
+   This map says which role each of his 14 letters borrows —
+   the shapes/shading above are untouched, only which hex each
+   letter resolves to changes (see buildArt(), which turns this
+   into an actual K/S/s/... palette from the active this.palette
+   before drawing him). Chosen to keep his silhouette reading the
+   same way it always has: dark shirt and hair, a mid-tone cap,
+   light skin, with the lens as the one small "spark" accent. */
+const HERO_ROLE_MAP = {
+  K: 'K', S: 'L', s: 'M',
+  H: 'D', h: 'E',
+  P: 'M', p: 'D',
+  G: 'D', g: 'S',
+  T: 'D', t: 'E',
+  C: 'M', c: 'D',
+  N: 'D', n: 'E'
 };
 
 const HERO_DOWN = [
@@ -351,13 +360,18 @@ function heroFrames() {
    (right is just "left" mirrored by Phaser at render time, so
    there's no separate drawing to keep in sync) — each with two
    walking frames (a little hop) and one sitting frame.
-   ============================================================ */
-const HENRI_W = 26, HENRI_H = 20;
-const HENRI_COAT = '#f7f1e4';
-const HENRI_SHADE = '#dcd2ba';
-const HENRI_MARK = '#221e18';
 
-function drawHenri(ctx, dir, sit, bounce) {
+   Resolved Aug 2: like everything else, he's colored from the
+   active six-role palette rather than his own fixed white/cream
+   coat. His "coat" borrows the L (light) role, his belly-shadow
+   borrows M (mid), and his ears/eye-patch/nose borrow D (dark) —
+   the same light-to-dark relationship he always had, just riding
+   on whatever the current time-of-day palette is instead of a
+   fixed white. ============================================================ */
+const HENRI_W = 26, HENRI_H = 20;
+
+function drawHenri(ctx, dir, sit, bounce, pal) {
+  const coat = pal.L, shade = pal.M, mark = pal.D;
   const lift = bounce ? 1 : 0;      // trot hop
   const crouch = sit ? 2 : 0;       // settles lower when sitting
   const cx = 13;
@@ -365,43 +379,43 @@ function drawHenri(ctx, dir, sit, bounce) {
 
   if (dir === 'left') {
     const bodyY = groundY - 6 - lift;
-    pixelEllipse(ctx, 15, bodyY, sit ? 6 : 8, sit ? 6 : 5, HENRI_COAT);
-    pixelEllipse(ctx, 15, bodyY + 2, sit ? 5 : 7, 2, HENRI_SHADE);
+    pixelEllipse(ctx, 15, bodyY, sit ? 6 : 8, sit ? 6 : 5, coat);
+    pixelEllipse(ctx, 15, bodyY + 2, sit ? 5 : 7, 2, shade);
     const headX = sit ? 8 : 6, headY = bodyY - (sit ? 3 : 1);
-    pixelCircle(ctx, headX, headY, 4, HENRI_COAT);
-    ctx.fillStyle = HENRI_COAT;
+    pixelCircle(ctx, headX, headY, 4, coat);
+    ctx.fillStyle = coat;
     ctx.fillRect(headX - 6, headY, 3, 3);               // snout
-    ctx.fillStyle = HENRI_MARK;
+    ctx.fillStyle = mark;
     ctx.fillRect(headX - 7, headY + 1, 2, 2);            // nose
-    pixelEllipse(ctx, headX + 1, headY - 3, 2, 3, HENRI_MARK);  // ear
-    pixelCircle(ctx, headX + 2, headY - 1, 2, HENRI_MARK);      // eye patch
+    pixelEllipse(ctx, headX + 1, headY - 3, 2, 3, mark);  // ear
+    pixelCircle(ctx, headX + 2, headY - 1, 2, mark);      // eye patch
     if (sit) {
-      pixelEllipse(ctx, 22, bodyY + 2, 3, 3, HENRI_COAT);        // tail, curled
-      ctx.fillStyle = HENRI_COAT;
+      pixelEllipse(ctx, 22, bodyY + 2, 3, 3, coat);        // tail, curled
+      ctx.fillStyle = coat;
       ctx.fillRect(headX - 3, groundY - 2, 3, 3);                // front paws forward
     } else {
-      pixelEllipse(ctx, 22, bodyY - 3, 3, 4, HENRI_COAT);        // tail, trailing
-      ctx.fillStyle = HENRI_SHADE;
+      pixelEllipse(ctx, 22, bodyY - 3, 3, 4, coat);        // tail, trailing
+      ctx.fillStyle = shade;
       ctx.fillRect(10, groundY - 1, 3, 3 - lift);
       ctx.fillRect(19, groundY - 1, 3, 3 - lift);
     }
   } else {
     // down / up — seen mostly from above, a rounder silhouette
     const bodyY = groundY - 6 - lift;
-    pixelEllipse(ctx, cx, bodyY, 7, sit ? 6 : 5, HENRI_COAT);
+    pixelEllipse(ctx, cx, bodyY, 7, sit ? 6 : 5, coat);
     const headY = bodyY - (sit ? 5 : 4);
-    pixelCircle(ctx, cx, headY, 5, HENRI_COAT);
-    pixelEllipse(ctx, cx - 5, headY - 2, 2, 3, HENRI_MARK);      // ears
-    pixelEllipse(ctx, cx + 5, headY - 2, 2, 3, HENRI_MARK);
+    pixelCircle(ctx, cx, headY, 5, coat);
+    pixelEllipse(ctx, cx - 5, headY - 2, 2, 3, mark);      // ears
+    pixelEllipse(ctx, cx + 5, headY - 2, 2, 3, mark);
     if (dir === 'down') {
-      pixelCircle(ctx, cx - 3, headY, 2, HENRI_MARK);            // eye patch
-      ctx.fillStyle = HENRI_MARK;
+      pixelCircle(ctx, cx - 3, headY, 2, mark);            // eye patch
+      ctx.fillStyle = mark;
       ctx.fillRect(cx - 1, headY + 2, 2, 1);                     // nose
     } else {
-      pixelEllipse(ctx, cx, groundY - 1, 3, 2, HENRI_COAT);      // tail peeking out
+      pixelEllipse(ctx, cx, groundY - 1, 3, 2, coat);      // tail peeking out
     }
     if (!sit) {
-      ctx.fillStyle = HENRI_SHADE;
+      ctx.fillStyle = shade;
       ctx.fillRect(cx - 6, groundY - 1, 3, 3 - lift);
       ctx.fillRect(cx + 3, groundY - 1, 3, 3 - lift);
     }
@@ -1423,21 +1437,24 @@ class PrairieScene extends Phaser.Scene {
     this.propSize = {};
 
     // Which of the six time-of-day looks is active right now —
-    // everything organic and everything "built" below is colored
-    // from this one palette. Hero and Henri deliberately are NOT:
-    // how they map onto the role system is still an open question
-    // (see the project's ILLUSTRATION_DIRECTION notes), so they
-    // keep their own fixed colors until that's decided.
+    // everything in the game, him and Henri included as of Aug 2,
+    // is colored from this one palette rather than any private
+    // hex table.
     this.palette = computePalette(new Date());
     const pal = this.palette;
 
     /* ---- him ---- */
+    // Turn his 14-letter role map into an actual palette by looking
+    // each role up in the active six-color set.
+    const heroPal = {};
+    Object.keys(HERO_ROLE_MAP).forEach(k => { heroPal[k] = pal[HERO_ROLE_MAP[k]]; });
+
     const frames = heroFrames();
     const hw = 32 * SCALE;
     if (this.textures.exists('hero')) this.textures.remove('hero');
     const hero = this.textures.createCanvas('hero', frames.length * hw, hw);
     const hctx = hero.context || hero.getContext();
-    frames.forEach((f, i) => drawPixels(hctx, f.rows, HERO_PALETTE, i * hw, 0, SCALE));
+    frames.forEach((f, i) => drawPixels(hctx, f.rows, heroPal, i * hw, 0, SCALE));
     frames.forEach((f, i) => hero.add(f.name, 0, i * hw, 0, hw, hw));
     hero.refresh();
 
@@ -1452,7 +1469,7 @@ class PrairieScene extends Phaser.Scene {
       });
     });
 
-    this.buildHenriArt();
+    this.buildHenriArt(pal);
 
     /* ---- the ground ---- */
     // Fences, signposts, and the hedge all use letter grids too, so
@@ -1498,9 +1515,8 @@ class PrairieScene extends Phaser.Scene {
      outlined on its own little canvas first, then stamped into the
      sheet — outlining the whole sheet at once would smear a line
      across the gap between frames. */
-  buildHenriArt() {
+  buildHenriArt(pal) {
     const HW = HENRI_W, HH = HENRI_H;
-    const OUTLINE = '#241a12';
     const specs = [
       ['down0', 'down', false, false], ['down1', 'down', false, true], ['downSit', 'down', true, false],
       ['up0', 'up', false, false], ['up1', 'up', false, true], ['upSit', 'up', true, false],
@@ -1510,7 +1526,7 @@ class PrairieScene extends Phaser.Scene {
     const tex = this.textures.createCanvas('henri', specs.length * HW, HH);
     const ctx = tex.context || tex.getContext();
     specs.forEach((s, i) => {
-      const frame = this.smallCanvasOutlined(HW, HH, c => drawHenri(c, s[1], s[2], s[3]), OUTLINE);
+      const frame = this.smallCanvasOutlined(HW, HH, c => drawHenri(c, s[1], s[2], s[3], pal), pal.K);
       ctx.drawImage(frame, i * HW, 0);
     });
     tex.refresh();
