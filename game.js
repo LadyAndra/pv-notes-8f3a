@@ -78,6 +78,16 @@ function pixelCircle(ctx, cx, cy, r, color) {
   }
 }
 
+/* ---- a crisp pixel oval, same idea as the circle above ------ */
+function pixelEllipse(ctx, cx, cy, rx, ry, color) {
+  ctx.fillStyle = color;
+  for (let y = -ry; y <= ry; y++) {
+    for (let x = -rx; x <= rx; x++) {
+      if ((x * x) / (rx * rx) + (y * y) / (ry * ry) <= 1) ctx.fillRect(cx + x, cy + y, 1, 1);
+    }
+  }
+}
+
 /* ============================================================
    HIM
    ------------------------------------------------------------
@@ -246,6 +256,73 @@ function heroFrames() {
     frames.push({ name: dir + '2', rows: liftFoot(base[dir], 'r') });
   });
   return frames;
+}
+
+/* ============================================================
+   HENRI
+   ------------------------------------------------------------
+   Small, white coat, black ears, one black eye-patch marking —
+   drawn with round shapes rather than typed-out pixels (the same
+   trick the trees use), since a dog's silhouette is simple blobs:
+   a body, a head, two ears, a tail. Three poses — down, up, left
+   (right is just "left" mirrored by Phaser at render time, so
+   there's no separate drawing to keep in sync) — each with two
+   walking frames (a little hop) and one sitting frame.
+   ============================================================ */
+const HENRI_W = 26, HENRI_H = 20;
+const HENRI_COAT = '#f7f1e4';
+const HENRI_SHADE = '#dcd2ba';
+const HENRI_MARK = '#221e18';
+
+function drawHenri(ctx, dir, sit, bounce) {
+  const lift = bounce ? 1 : 0;      // trot hop
+  const crouch = sit ? 2 : 0;       // settles lower when sitting
+  const cx = 13;
+  const groundY = 18 - crouch;
+
+  if (dir === 'left') {
+    const bodyY = groundY - 6 - lift;
+    pixelEllipse(ctx, 15, bodyY, sit ? 6 : 8, sit ? 6 : 5, HENRI_COAT);
+    pixelEllipse(ctx, 15, bodyY + 2, sit ? 5 : 7, 2, HENRI_SHADE);
+    const headX = sit ? 8 : 6, headY = bodyY - (sit ? 3 : 1);
+    pixelCircle(ctx, headX, headY, 4, HENRI_COAT);
+    ctx.fillStyle = HENRI_COAT;
+    ctx.fillRect(headX - 6, headY, 3, 3);               // snout
+    ctx.fillStyle = HENRI_MARK;
+    ctx.fillRect(headX - 7, headY + 1, 2, 2);            // nose
+    pixelEllipse(ctx, headX + 1, headY - 3, 2, 3, HENRI_MARK);  // ear
+    pixelCircle(ctx, headX + 2, headY - 1, 2, HENRI_MARK);      // eye patch
+    if (sit) {
+      pixelEllipse(ctx, 22, bodyY + 2, 3, 3, HENRI_COAT);        // tail, curled
+      ctx.fillStyle = HENRI_COAT;
+      ctx.fillRect(headX - 3, groundY - 2, 3, 3);                // front paws forward
+    } else {
+      pixelEllipse(ctx, 22, bodyY - 3, 3, 4, HENRI_COAT);        // tail, trailing
+      ctx.fillStyle = HENRI_SHADE;
+      ctx.fillRect(10, groundY - 1, 3, 3 - lift);
+      ctx.fillRect(19, groundY - 1, 3, 3 - lift);
+    }
+  } else {
+    // down / up — seen mostly from above, a rounder silhouette
+    const bodyY = groundY - 6 - lift;
+    pixelEllipse(ctx, cx, bodyY, 7, sit ? 6 : 5, HENRI_COAT);
+    const headY = bodyY - (sit ? 5 : 4);
+    pixelCircle(ctx, cx, headY, 5, HENRI_COAT);
+    pixelEllipse(ctx, cx - 5, headY - 2, 2, 3, HENRI_MARK);      // ears
+    pixelEllipse(ctx, cx + 5, headY - 2, 2, 3, HENRI_MARK);
+    if (dir === 'down') {
+      pixelCircle(ctx, cx - 3, headY, 2, HENRI_MARK);            // eye patch
+      ctx.fillStyle = HENRI_MARK;
+      ctx.fillRect(cx - 1, headY + 2, 2, 1);                     // nose
+    } else {
+      pixelEllipse(ctx, cx, groundY - 1, 3, 2, HENRI_COAT);      // tail peeking out
+    }
+    if (!sit) {
+      ctx.fillStyle = HENRI_SHADE;
+      ctx.fillRect(cx - 6, groundY - 1, 3, 3 - lift);
+      ctx.fillRect(cx + 3, groundY - 1, 3, 3 - lift);
+    }
+  }
 }
 
 /* ============================================================
@@ -1001,6 +1078,17 @@ class PrairieScene extends Phaser.Scene {
     return c;
   }
 
+  /* Same, but traces a dark outline afterward — used for anything
+     built from round shapes rather than typed-out pixel art. */
+  smallCanvasOutlined(w, h, draw, outlineColor) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    draw(ctx);
+    outlinePass(ctx, w, h, outlineColor);
+    return c;
+  }
+
   buildArt() {
     this.propSize = {};
     const LEAF = '#1b3a17', WOOD = '#241a12', STONE = '#4a463f';
@@ -1025,6 +1113,8 @@ class PrairieScene extends Phaser.Scene {
         repeat: -1
       });
     });
+
+    this.buildHenriArt();
 
     /* ---- the ground ---- */
     this.tileArt = {
@@ -1068,6 +1158,41 @@ class PrairieScene extends Phaser.Scene {
     this.makeTexture('mailbox', 17, 17, c => drawMailbox(c, 17, 17), WOOD);
     this.makeTexture('bench', 28, 18, c => drawBench(c, 28, 18), WOOD);
     this.makeTexture('post', 14, 26, c => drawStonePost(c, 14, 26), STONE);
+  }
+
+  /* Henri gets his own small spritesheet: 9 frames (3 directions x
+     2 walk frames + 1 sit frame each). Each frame is drawn and
+     outlined on its own little canvas first, then stamped into the
+     sheet — outlining the whole sheet at once would smear a line
+     across the gap between frames. */
+  buildHenriArt() {
+    const HW = HENRI_W, HH = HENRI_H;
+    const OUTLINE = '#241a12';
+    const specs = [
+      ['down0', 'down', false, false], ['down1', 'down', false, true], ['downSit', 'down', true, false],
+      ['up0', 'up', false, false], ['up1', 'up', false, true], ['upSit', 'up', true, false],
+      ['left0', 'left', false, false], ['left1', 'left', false, true], ['leftSit', 'left', true, false]
+    ];
+    if (this.textures.exists('henri')) this.textures.remove('henri');
+    const tex = this.textures.createCanvas('henri', specs.length * HW, HH);
+    const ctx = tex.context || tex.getContext();
+    specs.forEach((s, i) => {
+      const frame = this.smallCanvasOutlined(HW, HH, c => drawHenri(c, s[1], s[2], s[3]), OUTLINE);
+      ctx.drawImage(frame, i * HW, 0);
+    });
+    tex.refresh();
+    specs.forEach((s, i) => tex.add(s[0], 0, i * HW, 0, HW, HH));
+
+    ['down', 'up', 'left'].forEach(dir => {
+      const key = 'henri-walk-' + dir;
+      if (this.anims.exists(key)) return;
+      this.anims.create({
+        key,
+        frames: [dir + '0', dir + '1'].map(f => ({ key: 'henri', frame: f })),
+        frameRate: 6,
+        repeat: -1
+      });
+    });
   }
 
   /* Stitch the whole floor of an area into one big picture. Much
@@ -1133,6 +1258,15 @@ class PrairieScene extends Phaser.Scene {
     this.blockerCollider = this.physics.add.collider(this.player, this.blockers);
     this.cameras.main.centerOn(spawnX, spawnY);
 
+    // Henri rides along in the fade rather than retracing the whole
+    // walk from the old area — he just reappears at your heel.
+    this.henriTrail = [];
+    if (this.henri) {
+      this.henri.setPosition(spawnX, spawnY + T * 0.6);
+      this.henriState = 'sit';
+      this.henriFacing = 'down';
+    }
+
     this.areaKey = key;
     this.area = a;
     this.exitCooldown = 350;
@@ -1169,6 +1303,16 @@ class PrairieScene extends Phaser.Scene {
     this.player.body.setCollideWorldBounds(true);
 
     this.cameras.main.startFollow(this.player, true, 0.14, 0.14);
+
+    // Henri — no physics body of his own. He simply retraces the
+    // path his human just walked, which is what keeps him out of
+    // fences and trees without needing his own collision checks.
+    this.henriShadow = this.add.ellipse(0, 0, 26, 9, 0x1d2b16, 0.22);
+    this.henri = this.add.sprite(0, 0, 'henri', 'downSit');
+    this.henri.setOrigin(0.5, 1);
+    this.henriTrail = [];
+    this.henriState = 'sit';
+    this.henriFacing = 'down';
   }
 
   /* ---------------------------------------------------------
@@ -1348,6 +1492,8 @@ class PrairieScene extends Phaser.Scene {
     this.player.setDepth(this.player.y);
     this.shadow.setPosition(this.player.x, this.player.y - 3).setDepth(this.player.y - 1);
 
+    this.updateHenri(delta, moving);
+
     this.checkSigns();
     this.checkExits();
 
@@ -1379,6 +1525,84 @@ class PrairieScene extends Phaser.Scene {
         return;
       }
     }
+  }
+
+  /* ---------------------------------------------------------
+     Henri
+     ------------------------------------------------------------
+     He doesn't pathfind. He follows a trail of breadcrumbs dropped
+     wherever the player has actually walked, aiming for the crumb
+     that's about a tile behind — the standard trick for a follower
+     that has to dodge the same obstacles you already dodged. If he
+     ever ends up miles away (a bug, not something that should
+     happen in normal play), he just steps up next to you instead
+     of trying to catch up the honest way.
+     --------------------------------------------------------- */
+  updateHenri(delta, playerMoving) {
+    if (!this.henri) return;
+
+    const trail = this.henriTrail;
+    const last = trail[trail.length - 1];
+    if (!last || Phaser.Math.Distance.Between(last.x, last.y, this.player.x, this.player.y) > 8) {
+      trail.push({ x: this.player.x, y: this.player.y });
+      if (trail.length > 240) trail.shift();
+    }
+
+    // walk backward along the trail until we've covered the lag
+    // distance — that point is where Henri is trying to get to
+    const FOLLOW_LAG = T * 1.1;
+    let target = { x: this.player.x, y: this.player.y };
+    let remaining = FOLLOW_LAG;
+    let px = this.player.x, py = this.player.y;
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i];
+      const segLen = Phaser.Math.Distance.Between(px, py, p.x, p.y);
+      if (segLen >= remaining) {
+        const t = segLen > 0 ? remaining / segLen : 0;
+        target = { x: Phaser.Math.Linear(px, p.x, t), y: Phaser.Math.Linear(py, p.y, t) };
+        remaining = -1;
+        break;
+      }
+      remaining -= segLen;
+      target = { x: p.x, y: p.y };
+      px = p.x; py = p.y;
+    }
+
+    // safety net: if something (a bug, not normal play) has left
+    // him miles away, just bring him along rather than have him
+    // trek all the way back across the map
+    const distToPlayer = Phaser.Math.Distance.Between(this.henri.x, this.henri.y, this.player.x, this.player.y);
+    if (distToPlayer > T * 7) this.henri.setPosition(target.x, target.y);
+
+    const dx = target.x - this.henri.x, dy = target.y - this.henri.y;
+    const dist = Math.hypot(dx, dy);
+    const HENRI_SPEED = TUNING.playerSpeed * 1.25;
+
+    if (dist > 3) {
+      const step = Math.min(dist, HENRI_SPEED * (delta / 1000));
+      this.henri.x += (dx / dist) * step;
+      this.henri.y += (dy / dist) * step;
+      if (Math.abs(dx) > Math.abs(dy)) this.henriFacing = dx > 0 ? 'right' : 'left';
+      else this.henriFacing = dy > 0 ? 'down' : 'up';
+    }
+
+    // he only sits once you've actually stopped AND he's caught up —
+    // otherwise he'd plop down mid-stride every time the gap closed
+    this.henriState = (playerMoving || dist > 6) ? 'walk' : 'sit';
+
+    const dirKey = this.henriFacing === 'right' ? 'left' : this.henriFacing;
+    this.henri.setFlipX(this.henriFacing === 'right');
+    if (this.henriState === 'walk') {
+      const anim = 'henri-walk-' + dirKey;
+      const cur = this.henri.anims.currentAnim;
+      if (!cur || cur.key !== anim || !this.henri.anims.isPlaying) this.henri.play(anim, true);
+    } else {
+      this.henri.anims.stop();
+      this.henri.setFrame(dirKey + 'Sit');
+    }
+
+    this.henri.setDepth(this.henri.y - 2);
+    this.henriShadow.setPosition(this.henri.x, this.henri.y - 2).setDepth(this.henri.y - 3);
   }
 }
 
