@@ -1591,6 +1591,382 @@ function drawStonePost(ctx, w, h, pal) {
   ctx.fillRect(0, 0, w, 3);
 }
 
+/* ============================================================
+   THE GARDEN — beds, plants, and the forecast sign
+   ------------------------------------------------------------
+   Added in Stage 3. Everything here is typed out as pixel grids,
+   the same way the trees and houses are.
+
+   One small labour-saving thing: a bed holds a little CLUMP of
+   three plants, not one. Rather than typing the same tomato
+   plant out three times side by side, each plant is typed ONCE
+   below, and clumpRows() stamps that one drawing across the bed
+   a few times at slightly different heights. So if you want to
+   redraw a plant, there's exactly one place to do it.
+   ============================================================ */
+
+/* ---- the raised bed ----------------------------------------
+   32 wide x 16 tall — exactly two map squares across, one down.
+   K outline   W wood light   w wood dark
+   m soil mid  d soil dark    e soil deepest
+   The dry bed and the watered bed are the same drawing; only
+   which colors m/d/e point at changes (see BED_PAL below). */
+const BED_ROWS = [
+  'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
+  'KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK',
+  'KwKKKKKKKKKKKKKKKKKKKKKKKKKKKKwK',
+  'KwKmdmdmdmdmdmdmdmdmdmdmdmdmdKwK',
+  'KwKdmdmdmdmdmdmdmdmdmdmdmdmdmKwK',
+  'KwKmdedmdmdedmdmdedmdmdedmdmdKwK',
+  'KwKdmdmdmdmdmdmdmdmdmdmdmdmdmKwK',
+  'KwKmdmdmdmdmdmdmdmdmdmdmdmdmdKwK',
+  'KwKdmdmedmdmdmedmdmdmedmdmdmeKwK',
+  'KwKdmdmdmdmdmdmdmdmdmdmdmdmdmKwK',
+  'KwKmdmdmdmdmdmdmdmdmdmdmdmdmdKwK',
+  'KwKmdedmdmdedmdmdedmdmdedmdmdKwK',
+  'KwKdmdmdmdmdmdmdmdmdmdmdmdmdmKwK',
+  'KwKeeeeeeeeeeeeeeeeeeeeeeeeeeKwK',
+  'KwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwK',
+  'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK'
+];
+
+/* ---- the plants --------------------------------------------
+   Each one is drawn once, small. Letters:
+     K outline    D dark leaf   M mid leaf   L light leaf
+     w a wooden pole (green beans climb one)
+     d, e  turned soil (used by the just-planted mounds)
+     F flower/fruit    f its shadow
+     C, c  the raised centre of a coneflower or a Susan
+   The F/f/C/c colors are the ONLY places in the whole game with
+   a real color of their own rather than a palette role — a
+   purple coneflower has to be purple. They still get nudged
+   toward whatever light the world is in, so they sit down at
+   dusk with everything else. */
+
+/* Stage 1 of 4 — just planted. Little mounds of turned soil. */
+const P_SEED = [
+  '.KKK.',
+  'KdddK',
+  'KeeeK',
+  '.KKK.'
+];
+
+/* Stage 2 of 4 — sprouted. Two first leaves. Flowers and
+   vegetables sprout a little differently, and that's the only
+   difference between them at this stage. */
+const P_SPROUT_FLOWER = [
+  '.K...K.',
+  'KLK.KLK',
+  'KMMLMMK',
+  '.KMDMK.',
+  '..KDK..',
+  '..KKK..'
+];
+const P_SPROUT_VEG = [
+  '.......',
+  'KLLKLLK',
+  'KMMDMMK',
+  '.KMDMK.',
+  '..KDK..',
+  '..KKK..'
+];
+
+/* Stages 3 and 4 — growing, then in bloom / ready to pick.
+   Each plant's silhouette is deliberately different enough to
+   tell apart at a glance across the yard. */
+
+const P_CONEFLOWER_GROW = [
+  '...K...',
+  '..KLK..',
+  '..KMK..',
+  '.KLMK..',
+  'KLLMK..',
+  '.KKMK..',
+  '..KMLK.',
+  '..KMLLK',
+  '..KMKK.',
+  '..KDK..',
+  '..KKK..'
+];
+const P_CONEFLOWER_BLOOM = [
+  '...KKK...',
+  '..KCCCK..',
+  '.KCcccCK.',
+  'KFCcccCFK',
+  'KFfCCCfFK',
+  'KFFfffFFK',
+  '.KFFFFFK.',
+  '..KFFFK..',
+  '...KKK...',
+  '...KMK...',
+  '..KLMK...',
+  '.KLMMK...',
+  '...KMLK..',
+  '...KMK...',
+  '...KKK...'
+];
+
+const P_SUSAN_GROW = [
+  '...KKK...',
+  '..KLLK...',
+  '.KLMMLK..',
+  'KLMMMMLK.',
+  '.KMMDMMK.',
+  '..KMDMK..',
+  '..KMDMK..',
+  '...KDK...',
+  '...KKK...'
+];
+const P_SUSAN_BLOOM = [
+  '...KKKKK...',
+  '..KFFFFFK..',
+  '.KFFfffFFK.',
+  'KFFfcccfFFK',
+  'KFffcccffFK',
+  'KFFfcccfFFK',
+  '.KFFfffFFK.',
+  '..KFFFFFK..',
+  '...KKKKK...',
+  '....KMK....',
+  '...KLMK....',
+  '....KMK....',
+  '....KKK....'
+];
+
+const P_MILKWEED_GROW = [
+  '...KKK...',
+  '..KLMK...',
+  '.KLMMLK..',
+  'KLMKMMLK.',
+  '.KKMMKK..',
+  '..KMMK...',
+  '..KMDK...',
+  '..KKKK...'
+];
+const P_MILKWEED_BLOOM = [
+  '..KKKKKKK..',
+  '.KFfFfFfFK.',
+  'KfFfFfFfFfK',
+  'KFfFfFfFfFK',
+  '.KfFfFfFfK.',
+  '..KKKKKKK..',
+  '...KMMMK...',
+  '..KLMMMK...',
+  '...KMMMK...',
+  '..KLMMMLK..',
+  '...KMMMK...',
+  '...KKKKK...'
+];
+
+const P_BLAZINGSTAR_GROW = [
+  '..K..',
+  '.KLK.',
+  'KLMLK',
+  '.KMK.',
+  'KLMLK',
+  '.KMK.',
+  'KLMLK',
+  '.KMK.',
+  '.KMK.',
+  '.KDK.',
+  '.KDK.',
+  '.KKK.'
+];
+const P_BLAZINGSTAR_BLOOM = [
+  '...K...',
+  '..KFK..',
+  '.KFFFK.',
+  'KFfFfFK',
+  'KFFfFFK',
+  'KfFFFfK',
+  'KFfFfFK',
+  'KFFfFFK',
+  'KfFFFfK',
+  '.KFfFK.',
+  '.KFFFK.',
+  '..KFK..',
+  '..KKK..',
+  '..KMK..',
+  'KLMLK..',
+  '..KMK..',
+  '..KDK..',
+  '..KKK..'
+];
+
+const P_TOMATO_GROW = [
+  '...KKKKK...',
+  '..KLLLLLK..',
+  '.KLMMLMMLK.',
+  'KLMMDMMDMLK',
+  'KMMDMMMDMMK',
+  '.KMMDMDMMK.',
+  '..KMMDMMK..',
+  '...KMDMK...',
+  '....KDK....',
+  '....KKK....'
+];
+const P_TOMATO_BLOOM = [
+  '...KKKKK...',
+  '..KLLLLLK..',
+  '.KLMMLMMLK.',
+  'KLMFfMFfMLK',
+  'KMMFFMFFMMK',
+  'KMDMMMMMDMK',
+  '.KMFfMMDMK.',
+  '..KFFMDMK..',
+  '...KMDMK...',
+  '...KMDMK...',
+  '....KDK....',
+  '....KKK....'
+];
+
+const P_BEANS_GROW = [
+  '....K....',
+  '...KwK...',
+  '..KLwK...',
+  '.KLMwK...',
+  '..KKwLK..',
+  '...KwMLK.',
+  '...KwKKK.',
+  '..KLwK...',
+  '.KLMwK...',
+  '..KKwLK..',
+  '...KwMK..',
+  '...KwK...',
+  '...KwK...',
+  '...KKK...'
+];
+const P_BEANS_BLOOM = [
+  '....K....',
+  '...KwK...',
+  '..KLwK...',
+  '.KLMwKF..',
+  '..KKwKF..',
+  '..FKwMLK.',
+  '..FKwKKK.',
+  '..fKwK...',
+  '.KLwMKF..',
+  '.KKwKKF..',
+  '..KwMLKf.',
+  '...KwK...',
+  '...KwK...',
+  '...KwK...',
+  '...KKK...'
+];
+
+/* ---- the forecast sign -------------------------------------
+   34 wide x 29 tall. Two sunken panels; the little weather
+   pictures get placed on top of them by the game. */
+const WSIGN_ROWS = [
+  'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
+  'KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK',
+  'KWKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKwwwwwwwwwwwwwKKwwwwwwwwwwwwwKWK',
+  'KWKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKWK',
+  'KWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWK',
+  'KwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwK',
+  'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KWwK............KWwK.......',
+  '.......KKKK............KKKK.......'
+];
+
+/* ---- the three weather pictures ----------------------------
+   11 x 11 each, small enough to sit in the sign's panels.
+     F sun face   S its hot centre   L cloud light   M cloud mid
+     B raindrop */
+const ICON_SUN = [
+  '.....K.....',
+  '..K.....K..',
+  '...KKKKK...',
+  '..KFFFFFK..',
+  'KKFFSSSFFKK',
+  '.KFFSSSFFK.',
+  '..KFFFFFK..',
+  '...KKKKK...',
+  '..K.....K..',
+  '.....K.....',
+  '...........'
+];
+const ICON_CLOUD = [
+  '...........',
+  '.....KKK...',
+  '...KKLLLKK.',
+  '..KLLLLLLK.',
+  '.KKLLLLLLLK',
+  'KLLLLLLLLLK',
+  'KLLLLMLLLLK',
+  'KMMMMMMMMMK',
+  '.KKKKKKKKK.',
+  '...........',
+  '...........'
+];
+const ICON_RAIN = [
+  '...........',
+  '...KKKKK...',
+  '..KLLLLLK..',
+  '.KLLLLLLLK.',
+  'KMMMMMMMMMK',
+  '.KKKKKKKKK.',
+  '..B..B..B..',
+  '.B..B..B...',
+  '.B..B..B...',
+  'B..B..B....',
+  '...........'
+];
+
+/* Stamps one small typed drawing across a wider blank grid a
+   few times, so a bed reads as a little clump rather than one
+   lonely stem. Returns rows in exactly the same format as any
+   hand-typed grid, so everything downstream is none the wiser. */
+function clumpRows(unit, totalW, totalH) {
+  const uw = Math.max.apply(null, unit.map(r => r.length));
+  const uh = unit.length;
+  const grid = [];
+  for (let y = 0; y < totalH; y++) grid.push(new Array(totalW).fill('.'));
+
+  let spots;
+  if (uw <= 9) {
+    const m = Math.round((totalW - uw) / 2);
+    spots = [[m - uw - 2, 1], [m, 0], [m + uw + 2, 1]];
+  } else {
+    spots = [[1, 0], [totalW - uw - 1, 1]];
+  }
+
+  spots.forEach(([ox, dy]) => {
+    if (ox < 0 || ox + uw > totalW) return;
+    const oy = totalH - uh - dy;
+    for (let y = 0; y < uh; y++) {
+      for (let x = 0; x < unit[y].length; x++) {
+        const c = unit[y][x];
+        if (c === '.' || c === ' ') continue;
+        const gy = oy + y, gx = ox + x;
+        if (gy < 0 || gy >= totalH || gx < 0 || gx >= totalW) continue;
+        grid[gy][gx] = c;
+      }
+    }
+  });
+  return grid.map(r => r.join(''));
+}
+
 /* Make the whole art block usable from a plain Node test script. */
 
 /* ============================================================
@@ -1636,8 +2012,256 @@ const PROP_BLOCK = {
   house_dormer: [381, 279], house_saltbox: [438, 264],
   shed: [261, 174],
   sign: [78, 40], parksign: [80, 36],
-  mailbox: [30, 20], bench: [78, 30], post: [40, 34]
+  mailbox: [30, 20], bench: [78, 30], post: [40, 34],
+  weathersign: [62, 26]
 };
+
+/* ============================================================
+   WEATHER, GROWING, AND REMEMBERING
+   ------------------------------------------------------------
+   Stage 3. Three ideas, kept deliberately separate from the
+   drawing and from Phaser so they can be tested on their own:
+
+   1. WHAT THE WEATHER IS. Every real calendar day has exactly
+      one weather — sunny, cloudy or rainy. It is not rolled at
+      random when the app opens; it is worked out FROM the date
+      itself. August 12th 2026 has the same weather whether he
+      looks it up today, tomorrow, or next year, and that's what
+      lets the sign promise tomorrow's weather honestly.
+
+   2. WHAT A DAY DOES TO A PLANT. Growth, wilting, recovery.
+
+   3. WHAT GETS WRITTEN DOWN. The whole garden squeezed into one
+      short line of text the browser keeps for us.
+   ============================================================ */
+
+/* ---- calendar odds and ends -------------------------------- */
+function dayKey(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function keyToDate(k) {
+  const [y, m, d] = k.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function nextDayKey(k) {
+  const d = keyToDate(k);
+  d.setDate(d.getDate() + 1);
+  return dayKey(d);
+}
+function dayNumber(k) {
+  const [y, m, d] = k.split('-').map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+/* Turns any short piece of text into a number, so it can be fed
+   to the same seeded random generator the grass tufts use. */
+function hashSeed(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+function seededRoll(str) {
+  const r = makeRng(hashSeed(str));
+  r(); r();
+  return r();
+}
+
+/* ---- what kind of weather each month tends to have ----------
+   [chance of rain, chance of cloud, chance of sun], one row per
+   month starting at January. Kansas-ish: wet springs, and a hot
+   dry stretch through July and August, which is exactly when he
+   gets the game — so watering matters from day one. */
+const SEASON_WEIGHTS = [
+  [0.20, 0.46, 0.34], [0.20, 0.45, 0.35], [0.38, 0.32, 0.30],
+  [0.42, 0.30, 0.28], [0.40, 0.30, 0.30], [0.26, 0.26, 0.48],
+  [0.15, 0.20, 0.65], [0.13, 0.20, 0.67], [0.22, 0.32, 0.46],
+  [0.24, 0.36, 0.40], [0.22, 0.42, 0.36], [0.20, 0.46, 0.34]
+];
+
+/* The weather for one real calendar day.
+   Two dice, not one: a slow one that leans a whole WEEK wetter
+   or drier, and a fast one for the individual day. That's what
+   makes a dry spell feel like a spell — four hot days in a row
+   he has to keep up with — instead of the weather flickering
+   about at random. */
+function weatherFor(key) {
+  const month = Number(key.slice(5, 7)) - 1;
+  const week = Math.floor(dayNumber(key) / 7);
+  const shift = (seededRoll('spell:' + week) - 0.5) * 0.30;
+
+  const w = SEASON_WEIGHTS[month];
+  const rain = Math.max(0.04, w[0] - shift);
+  const cloud = w[1];
+  const sun = Math.max(0.04, w[2] + shift);
+
+  const x = seededRoll('day:' + key) * (rain + cloud + sun);
+  if (x < rain) return 'rainy';
+  if (x < rain + cloud) return 'cloudy';
+  return 'sunny';
+}
+
+const WEATHER = {
+  sunny:  { label: 'Sunny',  icon: 'icon_sun',   note: 'Hot and clear — anything not watered will wilt.' },
+  cloudy: { label: 'Cloudy', icon: 'icon_cloud', note: 'Grey and still — a quiet growing day.' },
+  rainy:  { label: 'Rain',   icon: 'icon_rain',  note: 'Rain is watering the whole garden for you.' }
+};
+
+/* ---- what he can plant this stage --------------------------
+   Four prairie natives and two vegetables. Trees are Stage 4 and
+   deliberately are NOT in this list. */
+const SEEDS = [
+  { id: 'coneflower',  name: 'Purple Coneflower',   kind: 'flower',
+    bloom: { F: '#a86bc9', f: '#7b4599', C: '#e5a94f', c: '#8a5418' } },
+  { id: 'susan',       name: 'Black-Eyed Susan',    kind: 'flower',
+    bloom: { F: '#f2c437', f: '#c99a1e', C: '#f2c437', c: '#3d2a12' } },
+  { id: 'milkweed',    name: 'Butterfly Milkweed',  kind: 'flower',
+    bloom: { F: '#f0862a', f: '#c25e12', C: '#f0862a', c: '#8a4410' } },
+  { id: 'blazingstar', name: 'Prairie Blazing Star', kind: 'flower',
+    bloom: { F: '#c4519f', f: '#8f3574', C: '#c4519f', c: '#6b2456' } },
+  { id: 'tomato',      name: 'Tomatoes',            kind: 'veg',
+    bloom: { F: '#d63f2c', f: '#9c2617', C: '#d63f2c', c: '#6d1a10' } },
+  { id: 'beans',       name: 'Green Beans',         kind: 'veg',
+    bloom: { F: '#8ec95e', f: '#5b9438', C: '#8ec95e', c: '#3f6a26' } }
+];
+function seedById(id) { return SEEDS.find(s => s.id === id) || null; }
+
+const STAGE_NAMES = ['just planted', 'sprouting', 'growing', 'ready'];
+
+/* ---- where the beds are ------------------------------------
+   Six raised beds in the patch of back lawn that's been left
+   empty since Stage 1 — two rows of three. Counted in map
+   squares; each bed is two squares across and one deep, with a
+   clear two-square walkway all the way round. */
+const GARDEN_PLOTS = [
+  { col: 12, row: 5 }, { col: 16, row: 5 }, { col: 20, row: 5 },
+  { col: 12, row: 8 }, { col: 16, row: 8 }, { col: 20, row: 8 }
+];
+const PLOT_TILES_W = 2;
+
+/* ---- a brand-new, empty garden ----------------------------- */
+function newGarden() {
+  return {
+    v: 1,
+    day: null,
+    plots: GARDEN_PLOTS.map(() => ({
+      seed: null, stage: 0, wilted: false, watered: false, care: 0, picked: 0
+    }))
+  };
+}
+
+/* ---- starting a fresh day ----------------------------------
+   If it's a rainy day, every bed counts as watered the moment
+   the day begins — that IS the rain doing his job for him. */
+function beginDay(g, key) {
+  g.day = key;
+  const wet = weatherFor(key) === 'rainy';
+  g.plots.forEach(p => { p.watered = wet; });
+}
+
+/* ---- what one finished day does to one bed -----------------
+   The whole growing rulebook, in one place:
+     watered + sun     -> grows two stages (sun is a real bonus)
+     watered + cloud   -> grows one stage
+     watered + rain    -> grows one stage
+     dry     + cloud   -> nothing happens
+     dry     + sun     -> wilts, and slips back one stage
+   A wilted plant never dies and never slips below "just
+   planted". It spends two watered days recovering, then carries
+   on growing from wherever it got back to. */
+function endDay(plot, weather) {
+  if (!plot.seed) return;
+
+  if (plot.wilted) {
+    if (plot.watered) {
+      plot.care++;
+      if (plot.care >= 2) { plot.wilted = false; plot.care = 0; }
+    } else {
+      plot.care = 0;
+    }
+    return;
+  }
+
+  if (plot.watered) {
+    plot.stage = Math.min(3, plot.stage + (weather === 'sunny' ? 2 : 1));
+  } else if (weather === 'sunny') {
+    plot.wilted = true;
+    plot.care = 0;
+    plot.stage = Math.max(0, plot.stage - 1);
+  }
+}
+
+/* ---- catching up on days he wasn't here --------------------
+   Runs when the app opens, and again if he happens to be
+   playing at midnight. Walks forward one real day at a time,
+   applying that day's actual weather, so a week away is
+   genuinely a week of weather — rain waters for him, sun wilts
+   whatever was dry. Nothing is ever lost, only wilted. */
+function catchUp(g, todayKey) {
+  if (!g.day) { beginDay(g, todayKey); return 0; }
+  if (g.day > todayKey) { g.day = todayKey; return 0; }  // clock went backwards
+
+  let passed = 0;
+  while (g.day !== todayKey && passed < 400) {
+    const w = weatherFor(g.day);
+    g.plots.forEach(p => endDay(p, w));
+    beginDay(g, nextDayKey(g.day));
+    passed++;
+  }
+  // Safety net: if the app genuinely sat unopened for over a year,
+  // stop counting day by day and simply arrive at today. Nothing is
+  // lost — by then everything is wilted and waiting either way.
+  if (g.day !== todayKey) beginDay(g, todayKey);
+  return passed;
+}
+
+/* ---- remembering, silently ---------------------------------
+   One line of text under one name in the browser's own little
+   notepad ("localStorage"), rewritten after every plant, every
+   watering, and every new day. There is no save button because
+   there is nothing to press: it has already happened.
+   Wrapped in try/catch because a browser in private mode will
+   refuse to write — in that case the game still plays perfectly
+   for the session, it just forgets afterwards. */
+const SAVE_KEY = 'prairie-village-save-v1';
+
+function loadGarden() {
+  try {
+    const raw = window.localStorage.getItem(SAVE_KEY);
+    if (!raw) return newGarden();
+    const data = JSON.parse(raw);
+    if (!data || data.v !== 1 || !Array.isArray(data.plots)) return newGarden();
+    const g = newGarden();
+    g.day = typeof data.day === 'string' ? data.day : null;
+    for (let i = 0; i < g.plots.length; i++) {
+      const s = data.plots[i];
+      if (!s) continue;
+      g.plots[i] = {
+        seed: seedById(s.seed) ? s.seed : null,
+        stage: Math.max(0, Math.min(3, s.stage | 0)),
+        wilted: !!s.wilted,
+        watered: !!s.watered,
+        care: Math.max(0, Math.min(2, s.care | 0)),
+        picked: Math.max(0, s.picked | 0)
+      };
+    }
+    return g;
+  } catch (e) {
+    return newGarden();
+  }
+}
+
+function saveGarden(g) {
+  try {
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(g));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 
 /* ============================================================
    A MAP AREA
@@ -1766,8 +2390,24 @@ const AREAS = {
       a.prop('bush', 29.6, 12);
       a.prop('bush', 12, 3.9);
       a.prop('bush', 24, 3.9);
-      a.prop('bush', 18, 10.4);
-      a.prop('bush', 21, 10.4);
+      // These two used to sit at (18, 10.4) and (21, 10.4). Moved
+      // out to the corners of the patio in Stage 3 so they're not
+      // standing in the walkway between the garden and the house.
+      a.prop('bush', 15.5, 10.9);
+      a.prop('bush', 24.5, 10.9);
+
+      // THE GARDEN — six raised beds in the patch of lawn that has
+      // been kept deliberately empty since Stage 1. The ground under
+      // each bed is turned over to dirt, and each bed is solid, so
+      // he walks around them rather than over them.
+      GARDEN_PLOTS.forEach(p => {
+        a.rect(p.col, p.row, PLOT_TILES_W, 1, 'dirt');
+        a.solid(p.col * T, p.row * T + 8, PLOT_TILES_W * T, T - 12);
+      });
+
+      // the forecast sign, standing at the near corner of the garden
+      a.prop('weathersign', 9.2, 7.6);
+      a.signs.push({ x: 9.2 * T, y: 7.6 * T, weather: true });
 
       // out front
       a.prop('bush', 11.6, 21.9);
@@ -1930,6 +2570,20 @@ class PrairieScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#4e7d3a');
     this.cameras.main.roundPixels = true;
 
+    /* Stage 3 — before anything is drawn, pick up where he left off.
+       loadGarden() reads the one line the browser wrote down last
+       time; catchUp() then walks forward through every real day
+       that has passed since, applying that day's actual weather. */
+    this.garden = loadGarden();
+    this.daysAway = catchUp(this.garden, dayKey(new Date()));
+    if (this.daysAway > 0) saveGarden(this.garden);
+    this.weatherToday = weatherFor(this.garden.day);
+    this.weatherTomorrow = weatherFor(nextDayKey(this.garden.day));
+    this.activePlot = -1;
+    this.menuOpen = false;
+    this.plotViews = [];
+    this.signIcons = [];
+
     this.buildArt();
     this.buildPlayer();
     this.buildControls();
@@ -1949,11 +2603,25 @@ class PrairieScene extends Phaser.Scene {
     this.input.on('pointerup', (p) => this.onUp(p));
     this.input.on('pointerupoutside', (p) => this.onUp(p));
 
-    this.scale.on('resize', () => this.layoutControls());
+    this.scale.on('resize', () => {
+      if (this.menuOpen) this.closeSeedMenu();
+      this.layoutControls();
+    });
+    this.buildWeatherLook();
     this.layoutControls();
 
     // Start at his own back door, more or less.
     this.enterArea('home', 25 * T, 24.5 * T);
+
+    // If real days went by while the app was closed, say so once.
+    if (this.daysAway === 1) {
+      this.time.delayedCall(2400, () => this.toast(
+        'A new day — ' + WEATHER[this.weatherToday].label.toLowerCase() + '.', 3200));
+    } else if (this.daysAway > 1) {
+      this.time.delayedCall(2400, () => this.toast(
+        this.daysAway + ' days have gone by. Today is ' +
+        WEATHER[this.weatherToday].label.toLowerCase() + '.', 3600));
+    }
   }
 
   /* ---------------------------------------------------------
@@ -2072,6 +2740,70 @@ class PrairieScene extends Phaser.Scene {
     this.makeTexture('mailbox', 17, 17, c => drawMailbox(c, 17, 17, pal), pal.K);
     this.makeTexture('bench', 28, 18, c => drawBench(c, 28, 18, pal), pal.K);
     this.makeTexture('post', 14, 26, c => drawStonePost(c, 14, 26, pal), pal.K);
+
+    /* ---- Stage 3: the garden ----
+       The bed is drawn twice from the SAME typed grid — once with
+       dry soil colors, once with wet ones. That colour change is
+       the whole "I already watered this" signal. */
+    const BED_DRY = { K: pal.K, W: pal.M, w: pal.D, m: pal.M, d: pal.D, e: pal.E };
+    const BED_WET = { K: pal.K, W: pal.D, w: pal.E, m: pal.D, d: pal.E, e: pal.K };
+    const bsz = gridSize(BED_ROWS);
+    this.makeTexture('bed_dry', bsz.w, bsz.h, c => drawPixels(c, BED_ROWS, BED_DRY));
+    this.makeTexture('bed_wet', bsz.w, bsz.h, c => drawPixels(c, BED_ROWS, BED_WET));
+
+    /* Every bed's planting is drawn on a little 32 x 26 canvas that
+       sits on top of the bed — 32 across because that's exactly how
+       wide a bed is, 26 tall so a blazing star can stand up proud
+       of it. */
+    const PW = 32, PH = 26;
+    const leafPal = {
+      K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L, S: pal.S,
+      w: pal.M, d: pal.D, e: pal.E
+    };
+    /* Flowers keep their own real colour, nudged a quarter of the
+       way toward whatever light the world is in, so a coneflower is
+       always purple but goes quiet at dusk with everything else. */
+    const lit = hex => blendHex(hex, pal.M, 0.25);
+
+    this.makeTexture('plant_seed', PW, PH,
+      c => drawPixels(c, clumpRows(P_SEED, PW, PH), leafPal));
+    this.makeTexture('plant_sprout_flower', PW, PH,
+      c => drawPixels(c, clumpRows(P_SPROUT_FLOWER, PW, PH), leafPal));
+    this.makeTexture('plant_sprout_veg', PW, PH,
+      c => drawPixels(c, clumpRows(P_SPROUT_VEG, PW, PH), leafPal));
+
+    const PLANT_GRIDS = {
+      coneflower:  [P_CONEFLOWER_GROW, P_CONEFLOWER_BLOOM],
+      susan:       [P_SUSAN_GROW, P_SUSAN_BLOOM],
+      milkweed:    [P_MILKWEED_GROW, P_MILKWEED_BLOOM],
+      blazingstar: [P_BLAZINGSTAR_GROW, P_BLAZINGSTAR_BLOOM],
+      tomato:      [P_TOMATO_GROW, P_TOMATO_BLOOM],
+      beans:       [P_BEANS_GROW, P_BEANS_BLOOM]
+    };
+    SEEDS.forEach(s => {
+      const pl = Object.assign({}, leafPal, {
+        F: lit(s.bloom.F), f: lit(s.bloom.f),
+        C: lit(s.bloom.C), c: lit(s.bloom.c)
+      });
+      const grids = PLANT_GRIDS[s.id];
+      this.makeTexture('plant_' + s.id + '_grow', PW, PH,
+        c => drawPixels(c, clumpRows(grids[0], PW, PH), pl));
+      this.makeTexture('plant_' + s.id + '_bloom', PW, PH,
+        c => drawPixels(c, clumpRows(grids[1], PW, PH), pl));
+    });
+
+    const wsz = gridSize(WSIGN_ROWS);
+    this.makeTexture('weathersign', wsz.w, wsz.h, c => drawPixels(c, WSIGN_ROWS, FENCE_PAL));
+
+    const ICON_PAL = {
+      K: pal.K, L: pal.L, M: pal.M,
+      F: lit('#f6d24a'), S: lit('#fff3c4'), B: lit('#7fc4e8')
+    };
+    [['icon_sun', ICON_SUN], ['icon_cloud', ICON_CLOUD], ['icon_rain', ICON_RAIN]]
+      .forEach(pair => {
+        const g = gridSize(pair[1]);
+        this.makeTexture(pair[0], g.w, g.h, c => drawPixels(c, pair[1], ICON_PAL));
+      });
   }
 
   /* Henri gets his own small spritesheet: 9 frames (3 directions x
@@ -2139,6 +2871,13 @@ class PrairieScene extends Phaser.Scene {
     if (this.blockerCollider) { this.blockerCollider.destroy(); this.blockerCollider = null; }
     if (this.blockers) { this.blockers.clear(true, true); this.blockers.destroy(); this.blockers = null; }
     if (this.groundImage) { this.groundImage.destroy(); this.groundImage = null; }
+    if (this.plotViews) this.plotViews.forEach(v => { v.bed.destroy(); v.plant.destroy(); });
+    this.plotViews = [];
+    if (this.signIcons) this.signIcons.forEach(i => i.destroy());
+    this.signIcons = [];
+    if (this.plotGlow) { this.plotGlow.destroy(); this.plotGlow = null; }
+    this.activePlot = -1;
+    this.actionVerbShown = null;
     if (this.textures.exists('ground')) this.textures.remove('ground');
 
     // the floor
@@ -2162,6 +2901,8 @@ class PrairieScene extends Phaser.Scene {
       this.blockers.add(z);
       z.body.updateFromGameObject();
     });
+
+    if (key === 'home') this.buildGardenViews(a);
 
     const W = a.w * T, H = a.h * T;
     this.physics.world.setBounds(0, 0, W, H);
@@ -2262,6 +3003,16 @@ class PrairieScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 3).setAlpha(0);
     this.areaLabel.setShadow(0, 3, '#000000', 6, false, true);
 
+    // the round action button, and the word telling him what it
+    // will do right now — the one context-sensitive button
+    this.actionRing = this.add.circle(0, 0, 46, 0xf6ecd6, 0.13)
+      .setScrollFactor(0).setDepth(D).setVisible(false);
+    this.actionRing.setStrokeStyle(3, 0xf6ecd6, 0.55);
+    this.actionLabel = this.add.text(0, 0, '', {
+      fontFamily: '-apple-system, sans-serif', fontSize: '15px',
+      color: '#fff8e8', align: 'center'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 1).setVisible(false);
+
     this.readout = this.add.text(10, 10, '', {
       fontFamily: 'monospace', fontSize: '13px', color: '#ffffff',
       backgroundColor: 'rgba(0,0,0,0.35)', padding: { x: 6, y: 4 }
@@ -2271,6 +3022,8 @@ class PrairieScene extends Phaser.Scene {
   layoutControls() {
     const w = this.scale.width, h = this.scale.height;
     this.actionHint.setPosition(w * 0.75, h * 0.62);
+    this.actionRing.setPosition(w * 0.75, h * 0.62);
+    this.actionLabel.setPosition(w * 0.75, h * 0.62);
     this.readout.setPosition(10, 10);
     this.areaLabel.setPosition(w * 0.5, 52);
     this.msgText.setPosition(w * 0.5, h - 52);
@@ -2309,6 +3062,7 @@ class PrairieScene extends Phaser.Scene {
      Touch input  (unchanged from Stage 0)
      --------------------------------------------------------- */
   onDown(p) {
+    if (this.menuOpen) return;
     if (p.x >= this.scale.width * 0.5) { this.pressAction(p.x, p.y); return; }
     if (this.stickPointerId === null) {
       this.stickPointerId = p.id;
@@ -2318,6 +3072,7 @@ class PrairieScene extends Phaser.Scene {
   }
 
   onMove(p) {
+    if (this.menuOpen) return;
     if (p.id !== this.stickPointerId) return;
     const dx = p.x - this.stickBase.x;
     const dy = p.y - this.stickBase.y;
@@ -2358,6 +3113,10 @@ class PrairieScene extends Phaser.Scene {
       duration: 320, ease: 'Quad.Out',
       onComplete: () => ring.destroy()
     });
+
+    // Stage 3: if he's standing at a bed, the button does the
+    // gardening rather than nothing at all.
+    if (this.activePlot >= 0) this.doPlotAction(this.activePlot);
   }
 
   resolveDirection(vx, vy) {
@@ -2375,6 +3134,7 @@ class PrairieScene extends Phaser.Scene {
       if (this.player) this.player.body.setVelocity(0, 0);
       return;
     }
+    if (this.menuOpen) { this.player.body.setVelocity(0, 0); return; }
     if (this.exitCooldown > 0) this.exitCooldown -= delta;
 
     let vx = this.stickVector.x;
@@ -2410,18 +3170,30 @@ class PrairieScene extends Phaser.Scene {
     this.checkSigns();
     this.checkExits();
 
+    // has midnight slipped past while he's been playing?
+    this.dayCheck = (this.dayCheck || 0) - delta;
+    if (this.dayCheck <= 0) { this.dayCheck = 4000; this.checkNewDay(); }
+
+    this.activePlot = this.nearestPlot();
+    this.updatePlotHint();
+    this.stepRain(delta);
+
     this.readout.setText([
       `fps     ${Math.round(this.game.loop.actualFps)}`,
       `where   ${this.areaKey}`,
-      `facing  ${this.facing}`
+      `facing  ${this.facing}`,
+      `day     ${this.garden.day}`,
+      `weather ${this.weatherToday}`
     ].join('\n'));
   }
 
   checkSigns() {
+    // a message he just triggered himself wins over any sign
+    if (this.time.now < (this.toastUntil || 0)) return;
     let found = null;
     for (const s of this.area.signs) {
       if (Phaser.Math.Distance.Between(this.player.x, this.player.y, s.x, s.y) < 130) {
-        found = s.text; break;
+        found = s.weather ? this.forecastText() : s.text; break;
       }
     }
     if (found) this.showMessage(found);
@@ -2439,6 +3211,360 @@ class PrairieScene extends Phaser.Scene {
       }
     }
   }
+
+  /* ---------------------------------------------------------
+     THE GARDEN
+     ------------------------------------------------------------
+     Six raised beds in the back lawn. The rules live up in the
+     weather-and-growing block; everything down here is just
+     showing them on screen and listening for his thumb.
+     --------------------------------------------------------- */
+
+  /* Make the beds, the plants standing in them, the little
+     highlight that shows which bed he's at, and the two weather
+     pictures on the forecast sign. Called once, when he walks
+     into the backyard. */
+  buildGardenViews(a) {
+    GARDEN_PLOTS.forEach((p) => {
+      const x = p.col * T, y = p.row * T;
+      const bed = this.add.image(x, y, 'bed_dry')
+        .setOrigin(0, 0).setScale(SCALE).setDepth(y + 2);
+      const plant = this.add.image(x + PLOT_TILES_W * T / 2, y + 13 * SCALE, 'plant_seed')
+        .setOrigin(0.5, 1).setScale(SCALE).setDepth(y + T - 6).setVisible(false);
+      this.plotViews.push({ bed, plant });
+    });
+
+    this.plotGlow = this.add.rectangle(0, 0, PLOT_TILES_W * T, T, 0xfff2c4, 0.10)
+      .setOrigin(0, 0).setVisible(false).setDepth(3);
+    this.plotGlow.setStrokeStyle(3, 0xfff2c4, 0.85);
+
+    // the two weather pictures, nailed onto the sign's panels
+    const sign = a.props.filter(pr => pr.key === 'weathersign')[0];
+    if (sign) {
+      const sz = this.propSize['weathersign'];
+      const left = sign.x - (sz.w * SCALE) / 2;
+      const top = sign.y - sz.h * SCALE;
+      [[4, 'weatherToday'], [19, 'weatherTomorrow']].forEach(spot => {
+        const ic = this.add.image(left + spot[0] * SCALE, top + 4 * SCALE,
+                                  WEATHER[this[spot[1]]].icon)
+          .setOrigin(0, 0).setScale(SCALE).setDepth(sign.y + 1);
+        this.signIcons.push(ic);
+      });
+    }
+
+    this.refreshGarden();
+  }
+
+  /* Redraw every bed from the saved numbers. Called after any
+     change, so there's only ever one place that decides what a
+     bed looks like. */
+  refreshGarden() {
+    if (!this.plotViews || !this.plotViews.length) return;
+    this.garden.plots.forEach((p, i) => {
+      const v = this.plotViews[i];
+      if (!v) return;
+      v.bed.setTexture(p.watered ? 'bed_wet' : 'bed_dry');
+
+      if (!p.seed) { v.plant.setVisible(false); return; }
+      const s = seedById(p.seed);
+      let key;
+      if (p.stage === 0) key = 'plant_seed';
+      else if (p.stage === 1) key = (s.kind === 'veg') ? 'plant_sprout_veg' : 'plant_sprout_flower';
+      else if (p.stage === 2) key = 'plant_' + s.id + '_grow';
+      else key = 'plant_' + s.id + '_bloom';
+
+      v.plant.setTexture(key).setVisible(true);
+      // a wilted plant goes grey-green and droops a couple of
+      // pixels — same drawing, just tired
+      v.plant.setTint(p.wilted ? 0x9aa07e : 0xffffff);
+      v.plant.y = GARDEN_PLOTS[i].row * T + 13 * SCALE + (p.wilted ? 3 : 0);
+    });
+  }
+
+  refreshSignIcons() {
+    if (!this.signIcons || this.signIcons.length < 2) return;
+    this.signIcons[0].setTexture(WEATHER[this.weatherToday].icon);
+    this.signIcons[1].setTexture(WEATHER[this.weatherTomorrow].icon);
+  }
+
+  /* Which bed is he standing at? -1 for none. The reach is a bit
+     under half the gap between beds, so it's never ambiguous. */
+  nearestPlot() {
+    if (this.areaKey !== 'home' || !this.plotViews.length) return -1;
+    let best = -1, bestD = 92;
+    GARDEN_PLOTS.forEach((p, i) => {
+      const cx = p.col * T + PLOT_TILES_W * T / 2;
+      const cy = p.row * T + T / 2;
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, cx, cy);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  /* What the one action button will do if he presses it now. */
+  plotVerb(i) {
+    const p = this.garden.plots[i];
+    if (!p.seed) return 'PLANT';
+    if (!p.watered) return 'WATER';
+    if (p.stage === 3 && !p.wilted) {
+      return (seedById(p.seed).kind === 'veg') ? 'HARVEST' : 'REPLANT';
+    }
+    return 'CHECK';
+  }
+
+  updatePlotHint() {
+    const i = this.activePlot;
+    if (this.plotGlow) {
+      if (i >= 0) {
+        this.plotGlow
+          .setPosition(GARDEN_PLOTS[i].col * T, GARDEN_PLOTS[i].row * T)
+          .setDepth(GARDEN_PLOTS[i].row * T + 3)
+          .setVisible(true);
+      } else {
+        this.plotGlow.setVisible(false);
+      }
+    }
+    const verb = i >= 0 ? this.plotVerb(i) : '';
+    if (this.actionVerbShown === verb) return;
+    this.actionVerbShown = verb;
+    this.actionLabel.setText(verb).setVisible(!!verb);
+    this.actionRing.setVisible(!!verb);
+    this.actionHint.setVisible(!verb);
+  }
+
+  /* The button was pressed while he's at a bed. */
+  doPlotAction(i) {
+    const p = this.garden.plots[i];
+    const verb = this.plotVerb(i);
+
+    if (verb === 'PLANT' || verb === 'REPLANT') {
+      this.openSeedMenu(i, verb === 'REPLANT');
+      return;
+    }
+
+    if (verb === 'WATER') {
+      p.watered = true;
+      this.commitGarden();
+      this.toast(p.seed
+        ? 'Watered the ' + seedById(p.seed).name.toLowerCase() + '.'
+        : 'Turned and watered the bed. Ready for seed.');
+      return;
+    }
+
+    if (verb === 'HARVEST') {
+      const s = seedById(p.seed);
+      p.picked++;
+      p.seed = null; p.stage = 0; p.wilted = false; p.care = 0;
+      this.commitGarden();
+      this.toast('Picked the ' + s.name.toLowerCase() + '. The bed is clear again.');
+      return;
+    }
+
+    // CHECK — nothing to do, so just tell him how it's getting on
+    const s = seedById(p.seed);
+    let line = s.name + ' — ' + STAGE_NAMES[p.stage];
+    if (p.wilted) line += ', wilted (' + (2 - p.care) + ' more day' +
+                          (2 - p.care === 1 ? '' : 's') + ' of water)';
+    line += '.';
+    if (p.watered) line += ' Watered today.';
+    this.toast(line);
+  }
+
+  /* ---- picking a seed --------------------------------------
+     A plain list of buttons over a dimmed screen. While it's
+     open the thumb-stick is switched off, so nothing can be
+     nudged by accident. */
+  openSeedMenu(plotIndex, isReplant) {
+    if (this.menuOpen) return;
+    this.menuOpen = true;
+    this.menuPlot = plotIndex;
+    // A quarter of a second where the menu ignores taps, so the very
+    // same quick jab that opened it can't also pick something.
+    this.menuReadyAt = this.time.now + 250;
+
+    this.player.body.setVelocity(0, 0);
+    this.stickPointerId = null;
+    this.stickVector.set(0, 0);
+    this.stickBase.setVisible(false);
+    this.stickKnob.setVisible(false);
+
+    const D = 20000;
+    const w = this.scale.width, h = this.scale.height;
+    const objs = [];
+    const font = '-apple-system, sans-serif';
+
+    const veil = this.add.rectangle(w / 2, h / 2, w * 2, h * 2, 0x120c06, 0.74)
+      .setScrollFactor(0).setDepth(D).setInteractive();
+    objs.push(veil);
+
+    const rows = SEEDS.length + 1;
+    const head = 78;
+    const rowH = Math.max(34, Math.min(50, Math.floor((h - 60 - head) / rows)));
+    const panelW = Math.min(340, w - 36);
+    const panelH = head + rows * rowH + 12;
+    const px = Math.round(w / 2), py = Math.round(h / 2);
+    const top = py - panelH / 2;
+
+    const panel = this.add.rectangle(px, py, panelW, panelH, 0x2b1d11, 0.98)
+      .setScrollFactor(0).setDepth(D + 1);
+    panel.setStrokeStyle(3, 0xcb9f63, 0.95);
+    objs.push(panel);
+
+    const p = this.garden.plots[plotIndex];
+    objs.push(this.add.text(px, top + 26,
+      isReplant ? 'Replant this bed?' : 'What shall we plant?',
+      { fontFamily: font, fontSize: '20px', color: '#f6ecd6' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(D + 2));
+    objs.push(this.add.text(px, top + 52,
+      (isReplant && p.seed)
+        ? 'Growing now: ' + seedById(p.seed).name
+        : 'Bed ' + (plotIndex + 1) + ' of 6',
+      { fontFamily: font, fontSize: '13px', color: '#c9ab82' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(D + 2));
+
+    SEEDS.forEach((s, i) => {
+      const ry = Math.round(top + head + i * rowH + rowH / 2);
+      const btn = this.add.rectangle(px, ry, panelW - 26, rowH - 6, 0x3f2c19, 1)
+        .setScrollFactor(0).setDepth(D + 2).setInteractive();
+      btn.setStrokeStyle(2, 0x8a6b41, 0.9);
+      btn.on('pointerdown', () => {
+        if (this.time.now < this.menuReadyAt) return;
+        this.chooseSeed(s.id);
+      });
+      objs.push(btn);
+      objs.push(this.add.text(px, ry, s.name,
+        { fontFamily: font, fontSize: '17px', color: '#f6ecd6' })
+        .setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+    });
+
+    const cy = Math.round(top + head + SEEDS.length * rowH + rowH / 2);
+    const cancel = this.add.rectangle(px, cy, panelW - 26, rowH - 6, 0x241809, 1)
+      .setScrollFactor(0).setDepth(D + 2).setInteractive();
+    cancel.setStrokeStyle(2, 0x6b5231, 0.9);
+    cancel.on('pointerdown', () => {
+      if (this.time.now < this.menuReadyAt) return;
+      this.closeSeedMenu();
+    });
+    objs.push(cancel);
+    objs.push(this.add.text(px, cy, isReplant ? 'Leave it be' : 'Never mind',
+      { fontFamily: font, fontSize: '16px', color: '#c9ab82' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+
+    this.menuObjects = objs;
+  }
+
+  closeSeedMenu() {
+    if (!this.menuOpen) return;
+    this.menuOpen = false;
+    if (this.menuObjects) this.menuObjects.forEach(o => o.destroy());
+    this.menuObjects = null;
+  }
+
+  chooseSeed(id) {
+    const p = this.garden.plots[this.menuPlot];
+    p.seed = id;
+    p.stage = 0;
+    p.wilted = false;
+    p.care = 0;
+    this.closeSeedMenu();
+    this.commitGarden();
+    this.toast(p.watered
+      ? 'Planted ' + seedById(id).name.toLowerCase() + ' in the wet soil.'
+      : 'Planted ' + seedById(id).name.toLowerCase() + '. Give it a drink.');
+  }
+
+  /* ---- writing it down -------------------------------------
+     Every single change goes straight to the browser's notepad.
+     There is no save button because there is nothing to press. */
+  commitGarden() {
+    saveGarden(this.garden);
+    this.refreshGarden();
+    this.actionVerbShown = null;   // so the button re-reads itself
+  }
+
+  /* ---- the day turning over --------------------------------
+     Checked every few seconds, so if he's playing at midnight
+     the garden rolls over under him rather than waiting for the
+     next launch. */
+  checkNewDay() {
+    const today = dayKey(new Date());
+    if (!this.garden.day || today === this.garden.day) return;
+    const passed = catchUp(this.garden, today);
+    this.weatherToday = weatherFor(this.garden.day);
+    this.weatherTomorrow = weatherFor(nextDayKey(this.garden.day));
+    saveGarden(this.garden);
+    this.refreshGarden();
+    this.refreshSignIcons();
+    this.applyWeatherLook();
+    this.actionVerbShown = null;
+    if (passed > 0) {
+      this.toast('A new day in Prairie Village — ' +
+                 WEATHER[this.weatherToday].label.toLowerCase() + '.', 3200);
+    }
+  }
+
+  forecastText() {
+    return 'Today: ' + WEATHER[this.weatherToday].label +
+           '     Tomorrow: ' + WEATHER[this.weatherTomorrow].label + '\n' +
+           WEATHER[this.weatherToday].note;
+  }
+
+  /* A message he caused himself. Sits on top of any sign text
+     for a few seconds, then gets out of the way. */
+  toast(text, ms) {
+    this.showMessage(text);
+    this.toastUntil = this.time.now + (ms || 2600);
+  }
+
+  /* ---- what the weather looks like -------------------------
+     A thin wash of colour over the whole screen, plus falling
+     streaks when it rains. Deliberately cheap: one rectangle and
+     forty-odd little ones, nothing that will trouble a phone. */
+  buildWeatherLook() {
+    this.weatherTint = this.add.rectangle(0, 0, 4000, 4000, 0xffffff, 0)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(9000);
+    this.rainDrops = [];
+    for (let i = 0; i < 44; i++) {
+      this.rainDrops.push(
+        this.add.rectangle(0, 0, 2, 13, 0xbfe3f5, 0.5)
+          .setScrollFactor(0).setDepth(9001).setVisible(false)
+      );
+    }
+    this.applyWeatherLook();
+  }
+
+  applyWeatherLook() {
+    const look = {
+      sunny:  [0xffd9a0, 0.05],
+      cloudy: [0x5a6b7a, 0.13],
+      rainy:  [0x36485c, 0.24]
+    }[this.weatherToday] || [0xffffff, 0];
+    this.weatherTint.setFillStyle(look[0], look[1]);
+
+    const raining = (this.weatherToday === 'rainy');
+    const w = this.scale.width, h = this.scale.height;
+    this.rainDrops.forEach(r => {
+      r.setVisible(raining);
+      if (raining) {
+        r.x = Math.random() * w;
+        r.y = Math.random() * h;
+        r.fallSpeed = 620 + Math.random() * 340;
+      }
+    });
+  }
+
+  stepRain(delta) {
+    if (this.weatherToday !== 'rainy' || !this.rainDrops) return;
+    const w = this.scale.width, h = this.scale.height;
+    const dt = delta / 1000;
+    for (const r of this.rainDrops) {
+      r.y += (r.fallSpeed || 700) * dt;
+      r.x -= 90 * dt;
+      if (r.y > h + 14) { r.y = -20; r.x = Math.random() * w; }
+      if (r.x < -12) r.x = w + 12;
+    }
+  }
+
 
   /* ---------------------------------------------------------
      Henri
