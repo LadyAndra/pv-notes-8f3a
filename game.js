@@ -194,15 +194,24 @@ function computePalette(date) {
    letter resolves to changes (see buildArt(), which turns this
    into an actual K/S/s/... palette from the active this.palette
    before drawing him). Chosen to keep his silhouette reading the
-   same way it always has: dark shirt and hair, a mid-tone cap,
-   light skin, with the lens as the one small "spark" accent. */
+   same way it always has: dark shirt and hair, light skin, with
+   the lens as the one small "spark" accent.
+
+   Adjusted Aug 3 after judging him against all six palettes: the
+   cap and shorts had been mapped to M — but the grass he stands
+   on is an M base, so both vanished into the lawn at every time
+   of day (worst at Midnight, where the whole middle of him went
+   dark too). They now borrow L, which restores the original
+   relationship anyway — his tan shorts always sat close to his
+   skin tone, and a light cap over the dark hair band reads as
+   "backwards cap" even on the darkest night. */
 const HERO_ROLE_MAP = {
   K: 'K', S: 'L', s: 'M',
   H: 'D', h: 'E',
-  P: 'M', p: 'D',
+  P: 'L', p: 'D',
   G: 'D', g: 'S',
   T: 'D', t: 'E',
-  C: 'M', c: 'D',
+  C: 'L', c: 'D',
   N: 'D', n: 'E'
 };
 
@@ -211,32 +220,32 @@ const HERO_DOWN = [
   '................................',
   '................................',
   '...........KKKKKKKKKK...........',
-  '..........KPPPPPPPPPPK..........',
-  '..........KPPPPPPPPPPK..........',
-  '.........KPPPPPPPPPPPPK.........',
-  '.........KPPPPPPPPPPPPK.........',
+  '..........KPPPPPPPPPpK..........',
+  '..........KPPPPPPPPPpK..........',
+  '.........KPPPPPPPPPPppK.........',
+  '.........KPPPPPPPPPPppK.........',
   '.........KppppppppppppK.........',
   '.........KHHHHHHHHHHHHK.........',
-  '..........KSSSSSSSSSSK..........',
+  '..........KSSSSSSSSSsK..........',
   '..........KGGGGSSGGGGK..........',
   '..........KgKggGGggKgK..........',
-  '..........KsSSSSSSSSsK..........',
+  '..........KsSSSSSSSssK..........',
   '..........KHHSSSSSSHHK..........',
-  '..........KHHHHSSHHHHK..........',
-  '..........KHHHHHHHHHHK..........',
-  '...........KHHHHHHHHK...........',
-  '........KTTTTTTTTTTTTTTK........',
-  '........KTTTTTTTTTTTTTTK........',
-  '........KTtTTTTTTTTTTtTK........',
-  '........KTtTTTTTTTTTTtTK........',
-  '........KSSTTTTTTTTTTSSK........',
-  '........KSSTTTTTTTTTTSSK........',
-  '........KSSTTTTTTTTTTSSK........',
-  '..........KCCCCCCCCCCK..........',
-  '..........KCcCCCCCCcCK..........',
-  '..........KCCCCKKCCCCK..........',
-  '..........KSSSK..KSSSK..........',
-  '..........KSSSK..KSSSK..........',
+  '..........KHHHHSSHHhHK..........',
+  '..........KHHHHHHHHhhK..........',
+  '...........KHHHHHhhhK...........',
+  '........KTTTTTTTTTTTTttK........',
+  '........KTTTTTTTTTTTTttK........',
+  '........KTtTTTTTTTTTTttK........',
+  '........KTtTTTTTTTTTTttK........',
+  '........KSSTTTTTTTTTtttK........',
+  '........KSSTTTTTTTTTtttK........',
+  '........KSSTtttTTTTttssK........',
+  '..........KCCCCCCCCCcK..........',
+  '..........KCcCCCCCCccK..........',
+  '..........KCCCCKKCCCcK..........',
+  '..........KSSSK..KSssK..........',
+  '..........KSSSK..KSssK..........',
   '.........KNNNNK..KNNNNK.........',
   '.........KnnnnK..KnnnnK.........'
 ];
@@ -246,32 +255,32 @@ const HERO_UP = [
   '................................',
   '................................',
   '...........KKKKKKKKKK...........',
-  '..........KPPPPPPPPPPK..........',
-  '..........KPPPPPPPPPPK..........',
-  '.........KPPPPPPPPPPPPK.........',
-  '.........KPPPPPPPPPPPPK.........',
-  '.........KPPPPPPPPPPPPK.........',
-  '.........KPPPPPPPPPPPPK.........',
-  '.......KPPPPPPPPPPPPPPPPK.......',
+  '..........KPPPPPPPPPpK..........',
+  '..........KPPPPPPPPPpK..........',
+  '.........KPPPPPPPPPPppK.........',
+  '.........KPPPPPPPPPPppK.........',
+  '.........KPPPPPPPPPPppK.........',
+  '.........KPPPPPPPPPPppK.........',
+  '.......KPPPPPPPPPPPPPPppK.......',
   '.......KppppppppppppppppK.......',
   '.......KKKKKKKKKKKKKKKKKK.......',
-  '..........KHHHHHHHHHHK..........',
-  '..........KHHHHHHHHHHK..........',
-  '..........KHhHHHHHHhHK..........',
-  '..........KHHHHHHHHHHK..........',
-  '...........KHHHHHHHHK...........',
-  '........KTTTTTTTTTTTTTTK........',
-  '........KTTTTTTTTTTTTTTK........',
-  '........KTtTTTTTTTTTTtTK........',
-  '........KTtTTTTTTTTTTtTK........',
-  '........KSSTTTTTTTTTTSSK........',
-  '........KSSTTTTTTTTTTSSK........',
-  '........KSSTTTTTTTTTTSSK........',
-  '..........KCCCCCCCCCCK..........',
-  '..........KCcCCCCCCcCK..........',
-  '..........KCCCCKKCCCCK..........',
-  '..........KSSSK..KSSSK..........',
-  '..........KSSSK..KSSSK..........',
+  '..........KHHHHHHHHHhK..........',
+  '..........KHHHHHHHHHhK..........',
+  '..........KHhHHHHHHhhK..........',
+  '..........KHHHHHHHHhhK..........',
+  '...........KHHHHHhhhK...........',
+  '........KTTTTTTTTTTTTttK........',
+  '........KTTTTTTTTTTTTttK........',
+  '........KTtTTTTTTTTTTttK........',
+  '........KTtTTTTTTTTTTttK........',
+  '........KSSTTTTTTTTTtttK........',
+  '........KSSTTTTTTTTTtttK........',
+  '........KSSTtttTTTTttssK........',
+  '..........KCCCCCCCCCcK..........',
+  '..........KCcCCCCCCccK..........',
+  '..........KCCCCKKCCCcK..........',
+  '..........KSSSK..KSssK..........',
+  '..........KSSSK..KSssK..........',
   '.........KNNNNK..KNNNNK.........',
   '.........KnnnnK..KnnnnK.........'
 ];
@@ -281,33 +290,33 @@ const HERO_LEFT = [
   '................................',
   '................................',
   '...........KKKKKKKKK............',
-  '..........KPPPPPPPPPK...........',
-  '..........KPPPPPPPPPK...........',
-  '..........KPPPPPPPPPK...........',
-  '..........KPPPPPPPPPK...........',
+  '..........KPPPPPPPPpK...........',
+  '..........KPPPPPPPPpK...........',
+  '..........KPPPPPPPppK...........',
+  '..........KPPPPPPPppK...........',
   '..........KpppppppppK...........',
-  '..........KpppppppppPPPPPPPK....',
+  '..........KpppppppppPPPPPPpK....',
   '..........KHHHHHHHHHpppppppK....',
   '..........KSSSSSSSHHK...........',
   '..........KGggGSSSHHK...........',
-  '..........KsSSSSSHHHK...........',
-  '..........KHSSSSHHHHK...........',
-  '..........KHHSSHHHHHK...........',
-  '..........KHHHHHHHHHK...........',
-  '...........KHHHHHHHK............',
-  '.........KTTTTTTTTTTTTK.........',
-  '.........KTTTTTTTTTTTTK.........',
-  '.........KTTTTTTTTTTtTK.........',
-  '.........KTTTTTTTTTTtTK.........',
-  '.........KSSTTTTTTTTTTK.........',
-  '.........KSSTTTTTTTTTTK.........',
-  '.........KSSTTTTTTTTTTK.........',
-  '..........KCCCCCCCCCCK..........',
-  '..........KCcCCCCCCcCK..........',
-  '..........KCCCCCCCCCCK..........',
-  '...........KSSSSSSSSK...........',
-  '...........KSSSSSSSSK...........',
-  '..........KNNNNNNNNNK...........',
+  '..........KsSSSSSHHhK...........',
+  '..........KHSSSSHHHhK...........',
+  '..........KHHSSHHHHhK...........',
+  '..........KHHHHHHHhhK...........',
+  '...........KHHHHHhhK............',
+  '.........KTTTTTTTTTTttK.........',
+  '.........KTTTTTTTTTTttK.........',
+  '.........KTtTTTTTTTTttK.........',
+  '.........KTtTTTTTTTTttK.........',
+  '.........KSSTTTTTTTtttK.........',
+  '.........KSSTTTTTTTtttK.........',
+  '.........KSSTttTTTttttK.........',
+  '..........KCCCCCCCCCcK..........',
+  '..........KCcCCCCCCccK..........',
+  '..........KCCCCCCCCCcK..........',
+  '...........KSSSSSSssK...........',
+  '...........KSSSSSSssK...........',
+  '..........KNNNNNNNNnK...........',
   '..........KnnnnnnnnnK...........'
 ];
 
@@ -370,56 +379,163 @@ function heroFrames() {
    fixed white. ============================================================ */
 const HENRI_W = 26, HENRI_H = 20;
 
-function drawHenri(ctx, dir, sit, bounce, pal) {
-  const coat = pal.L, shade = pal.M, mark = pal.D;
-  const lift = bounce ? 1 : 0;      // trot hop
-  const crouch = sit ? 2 : 0;       // settles lower when sitting
-  const cx = 13;
-  const groundY = 18 - crouch;
+/* Henri, redrawn Aug 3 as hand-pixel letter grids — the same
+   treatment as every other living thing in the game. He'd been the
+   one creature still drawn by code as smooth ovals, which is why he
+   looked soft next to the hand-drawn trees. Six poses; walking
+   bounce is the whole drawing lifted one pixel. Same letters as
+   the trees: K outline, L coat, M coat shading (kept away from the
+   silhouette edge so he can't melt into M-based grass), D for his
+   black ears, eye patch and nose, E for the shadow under him. */
+const HENRI_LEFT = [
+  '..........................',
+  '..........................',
+  '....KKKK..................',
+  '...KLLLLKKK...............',
+  '..KLDDLLLDDK..............',
+  '..KLDDLLLDDDK.........KK..',
+  '.KDLLLLLLLDDK........KLLK.',
+  '.KDLLLLLLLDDK........KLLK.',
+  '..KLLLLLLLLDK.......KLLK..',
+  '..KKLLLLLLLLKKKKKKKKLLLK..',
+  '...KLLLLLLLLLLLLLLLLLLLK..',
+  '...KKLLLLLLLLLLLLLMMLLK...',
+  '....KLLLLLLLLLLLMMMLLK....',
+  '....KKLLLLLLLLLMMMLLKK....',
+  '.....KLLEELLLLLEELLLK.....',
+  '.....KKKLLKKKKKKLLKKK.....',
+  '.......KLLK....KLLK.......',
+  '.......KLLK....KLLK.......',
+  '.......KLLK....KLLK.......',
+  '.......KKKK....KKKK.......'
+];
 
-  if (dir === 'left') {
-    const bodyY = groundY - 6 - lift;
-    pixelEllipse(ctx, 15, bodyY, sit ? 6 : 8, sit ? 6 : 5, coat);
-    pixelEllipse(ctx, 15, bodyY + 2, sit ? 5 : 7, 2, shade);
-    const headX = sit ? 8 : 6, headY = bodyY - (sit ? 3 : 1);
-    pixelCircle(ctx, headX, headY, 4, coat);
-    ctx.fillStyle = coat;
-    ctx.fillRect(headX - 6, headY, 3, 3);               // snout
-    ctx.fillStyle = mark;
-    ctx.fillRect(headX - 7, headY + 1, 2, 2);            // nose
-    pixelEllipse(ctx, headX + 1, headY - 3, 2, 3, mark);  // ear
-    pixelCircle(ctx, headX + 2, headY - 1, 2, mark);      // eye patch
-    if (sit) {
-      pixelEllipse(ctx, 22, bodyY + 2, 3, 3, coat);        // tail, curled
-      ctx.fillStyle = coat;
-      ctx.fillRect(headX - 3, groundY - 2, 3, 3);                // front paws forward
-    } else {
-      pixelEllipse(ctx, 22, bodyY - 3, 3, 4, coat);        // tail, trailing
-      ctx.fillStyle = shade;
-      ctx.fillRect(10, groundY - 1, 3, 3 - lift);
-      ctx.fillRect(19, groundY - 1, 3, 3 - lift);
-    }
-  } else {
-    // down / up — seen mostly from above, a rounder silhouette
-    const bodyY = groundY - 6 - lift;
-    pixelEllipse(ctx, cx, bodyY, 7, sit ? 6 : 5, coat);
-    const headY = bodyY - (sit ? 5 : 4);
-    pixelCircle(ctx, cx, headY, 5, coat);
-    pixelEllipse(ctx, cx - 5, headY - 2, 2, 3, mark);      // ears
-    pixelEllipse(ctx, cx + 5, headY - 2, 2, 3, mark);
-    if (dir === 'down') {
-      pixelCircle(ctx, cx - 3, headY, 2, mark);            // eye patch
-      ctx.fillStyle = mark;
-      ctx.fillRect(cx - 1, headY + 2, 2, 1);                     // nose
-    } else {
-      pixelEllipse(ctx, cx, groundY - 1, 3, 2, coat);      // tail peeking out
-    }
-    if (!sit) {
-      ctx.fillStyle = shade;
-      ctx.fillRect(cx - 6, groundY - 1, 3, 3 - lift);
-      ctx.fillRect(cx + 3, groundY - 1, 3, 3 - lift);
-    }
-  }
+const HENRI_LEFT_SIT = [
+  '..........................',
+  '..........................',
+  '.....KKKK.................',
+  '....KLLLLKKK..............',
+  '...KLDDLLLDDK.............',
+  '...KLDDLLLDDDK............',
+  '..KDLLLLLLLDDK............',
+  '..KDLLLLLLLDDK............',
+  '...KLLLLLLLLDK............',
+  '....KKLLLLLLKKK...........',
+  '.....KLLLLLLLLKK..........',
+  '.....KLLLLLLLLLLK.........',
+  '.....KLLLLLLLLLLLK........',
+  '.....KLLLLLLLLLLLLK.......',
+  '.....KLLLKLLLLLMMLKK......',
+  '.....KLLLKLLLLLLMLLKKK....',
+  '.....KLLLKLLLLLLLLLKLLK...',
+  '.....KLLLKKELLLLELKKLLK...',
+  '.....KKKKKKKLLLLLKKKKKK...',
+  '...........KKKKKK.........'
+];
+
+const HENRI_DOWN = [
+  '..........................',
+  '..........................',
+  '........KKKKKK............',
+  '......KKLLLLLLKK..........',
+  '.....KDLLLLLLLLDK.........',
+  '....KDDLLDDLLLLDDK........',
+  '....KDDLLDDLLLLDDK........',
+  '....KDDLLLLLLLLDDK........',
+  '.....KKLLLLLLLLKK.........',
+  '......KLLLDDLLLK..........',
+  '.....KKLLLLLLLLKK.........',
+  '....KKLLLLLLLLLLKK........',
+  '....KLLLLLLLLLLLLKK.......',
+  '....KLLLLLLLLLLMLLK.......',
+  '....KLLLLLLLLLMMLLK.......',
+  '.....KLLLLLLLLMLLK........',
+  '.....KKLLKKKKLLKKK........',
+  '......KLLK..KLLK..........',
+  '......KLLK..KLLK..........',
+  '......KKKK..KKKK..........'
+];
+
+const HENRI_DOWN_SIT = [
+  '..........................',
+  '..........................',
+  '..........................',
+  '........KKKKKK............',
+  '......KKLLLLLLKK..........',
+  '.....KDLLLLLLLLDK.........',
+  '....KDDLLDDLLLLDDK........',
+  '....KDDLLDDLLLLDDK........',
+  '....KDDLLLLLLLLDDK........',
+  '.....KKLLLLLLLLKK.........',
+  '......KLLLDDLLLK..........',
+  '.....KKLLLLLLLLKK.........',
+  '....KKLLLLLLLLLLKK........',
+  '...KKLLLLLLLLLLLLKK.......',
+  '...KLLLLLLLLLLLLMLK.......',
+  '...KLLLLLLLLLLLMMLLK......',
+  '...KKLLKKLLLLKKLLKKK......',
+  '.....KKKKLLLLKKKK.........',
+  '........KKKKKK............',
+  '..........................'
+];
+
+const HENRI_UP = [
+  '..........................',
+  '..........................',
+  '........KKKKKK............',
+  '......KKLLLLLLKK..........',
+  '.....KDLLLLLLLLDK.........',
+  '....KDDLLLLLLLLDDK........',
+  '....KDDLLLLLLLLDDK........',
+  '....KDDLLLLLLLLDDK........',
+  '.....KKLLLLLLLLKK.........',
+  '......KLLLLLLLLK..........',
+  '.....KKLLLLLLLLKK.........',
+  '....KKLLLLLLLLLLKK........',
+  '....KLLLLKMMKLLLLKK.......',
+  '....KLLLLKMMKLLLMLK.......',
+  '....KLLLLLKKLLLLLLK.......',
+  '.....KLLLLLLLLMLLK........',
+  '.....KKLLKKKKLLKKK........',
+  '......KLLK..KLLK..........',
+  '......KLLK..KLLK..........',
+  '......KKKK..KKKK..........'
+];
+
+const HENRI_UP_SIT = [
+  '..........................',
+  '..........................',
+  '..........................',
+  '........KKKKKK............',
+  '......KKLLLLLLKK..........',
+  '.....KDLLLLLLLLDK.........',
+  '....KDDLLLLLLLLDDK........',
+  '....KDDLLLLLLLLDDK........',
+  '....KDDLLLLLLLLDDK........',
+  '.....KKLLLLLLLLKK.........',
+  '.....KKLLLLLLLLKK.........',
+  '....KKLLLLLLLLLLKK........',
+  '...KKLLLLKMMKLLLLKK.......',
+  '...KLLLLLKMMKLLLLLKK......',
+  '...KLLLLLLKKLLLLLMLK......',
+  '...KKLLLLLLLLLLLLLLK......',
+  '.....KKKKKKKKKKKKKK.......',
+  '..........................',
+  '..........................',
+  '..........................'
+];
+
+const HENRI_GRIDS = {
+  left: HENRI_LEFT, leftSit: HENRI_LEFT_SIT,
+  down: HENRI_DOWN, downSit: HENRI_DOWN_SIT,
+  up: HENRI_UP, upSit: HENRI_UP_SIT
+};
+
+function drawHenri(ctx, dir, sit, bounce, pal) {
+  const rows = HENRI_GRIDS[dir + (sit ? 'Sit' : '')];
+  const hp = { K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L };
+  // the trot hop: the whole drawing lifts one pixel
+  drawPixels(ctx, rows, hp, 0, bounce ? -1 : 0);
 }
 
 /* ============================================================
@@ -1913,7 +2029,7 @@ const ICON_CLOUD = [
   '..KLLLLLLK.',
   '.KKLLLLLLLK',
   'KLLLLLLLLLK',
-  'KLLLLMLLLLK',
+  'KLLLLMLLMLK',
   'KMMMMMMMMMK',
   '.KKKKKKKKK.',
   '...........',
@@ -1967,7 +2083,351 @@ function clumpRows(unit, totalW, totalH) {
   return grid.map(r => r.join(''));
 }
 
-/* Make the whole art block usable from a plain Node test script. */
+/* ============================================================
+   STAGE 4 ART — THE FIVE NATIVE TREES
+   ------------------------------------------------------------
+   Same language as every other living thing in the game: one
+   letter per pixel, light from the upper-left, K sealing the
+   silhouette, E shadow strokes tucked under lit clumps, D mass
+   falling to the lower-right, S sparks rare and small. Every
+   trunk here is capped with a row of K so it can never poke out
+   from under its own canopy with a raw edge.
+
+   Two extra letters appear that no other tree uses: F and f, a
+   blossom or a berry. Only the redbud and the serviceberry
+   have them. Everything else is the six roles.
+
+   The five are told apart by SHAPE, never by colour:
+     bur oak       broad and low-crowned, wider than it is tall
+     sycamore      the giant — high crown over a pale mottled trunk
+     hickory       narrow and tall, trunk flaking in and out
+     redbud        small and low, magenta along the branches
+     serviceberry  slim, forked, white flower and dark fruit
+   ============================================================ */
+
+/* ---- the shared sapling ------------------------------------
+   Every species looks like this for its first five days, which
+   is honest: you can't tell a redbud whip from an oak whip at
+   arm's length either. */
+const T_SAPLING = [
+  '.....KKK......',
+  '....KMLLK.....',
+  '....KMLSK.....',
+  '.....KMMK.....',
+  '.....KMK......',
+  '..KKKKMK......',
+  '.KMLLDMK......',
+  '.KMLLLMK.KKK..',
+  '.KMMLDMKKMLLK.',
+  '..KKKKMMMLLLK.',
+  '......KMKKKKK.',
+  '......KMK.....',
+  '......KMK.....',
+  '......KMK.....',
+  '.....KEDMK....',
+  '.....KEDMK....',
+  '....KEEDMMK...',
+  '....KKKKKKK...'
+];
+
+/* ---- the two young forms -----------------------------------
+   A round-crowned one (bur oak, redbud) and an upright one
+   (serviceberry, hickory, sycamore). Five days at this size,
+   then it comes into its own shape. */
+const T_YOUNG_ROUND = [
+  '.....KKKK......',
+  '...KKMLLMKK....',
+  '..KMLMLLLMMKK..',
+  '.KMLLSLLMLMMMK.',
+  '.KMLLLLMLMMMMK.',
+  'KMLMLLMMMMMMMMK',
+  'KMLMEELMMMMDMMK',
+  'KMMLMEEMMMDMMMK',
+  '.KMMLMMMDMDMMK.',
+  'KMMMMMMDMDDDMMK',
+  'KMDMMMDDDDDDDMK',
+  'KMDMDMDDDDEDDDK',
+  '.KMDMDDDDDDDDK.',
+  '.KKMDDDDDDDKK..',
+  '...KKDDDDKK....',
+  '.....KKKKK.....',
+  '......KEDMK....',
+  '......KEDMK....',
+  '......KEDMK....',
+  '......KEDMK....',
+  '......KEDMK....',
+  '.....KEEDMMK...',
+  '.....KEEDMMK...',
+  '.....KKKKKKK...'
+];
+
+const T_YOUNG_UPRIGHT = [
+  '....KKKKK.....',
+  '..KKMLLMKK....',
+  '.KMLMLLLMMKK..',
+  'KMLLSLLMLMMMK.',
+  'KMLLLLMLMMMMK.',
+  'KMLMLLMMMMMMK.',
+  'KMLMEELMMMMMK.',
+  'KMMLMEEMMDMMK.',
+  '.KMMLMMMDMMK..',
+  'KMMMMMMDMDMMK.',
+  'KMDMMMDDDDDMK.',
+  'KMDMDMDDDDDDK.',
+  'KMMDMDDDEDDDK.',
+  '.KMDDDDDDDDK..',
+  '.KKMDDDDDKK...',
+  '...KKDDKK.....',
+  '....KKKKK.....',
+  '....KEDMK.....',
+  '....KEDMK.....',
+  '....KEDMK.....',
+  '....KEDMK.....',
+  '....KEDMK.....',
+  '....KEDMK.....',
+  '...KEEDMMK....',
+  '...KEEDMMK....',
+  '...KKKKKKK....'
+];
+
+/* ---- BUR OAK -----------------------------------------------
+   The one everybody pictures. Crown wider than it is tall,
+   heavy horizontal lobes, sitting on a short stout trunk. */
+const T_BUROAK = [
+  '.....KKKK.......KKKK........',
+  '...KKMLLMKK...KKMLLMKK......',
+  '..KMLMLLLLMKKKMLLLLMMKK.....',
+  '.KMLLLSLLLLMMMLLLMLMMMMKK...',
+  'KMLLLLLLLLLLLMLLMLMMMMMMMKK.',
+  'KMLLMLLLLLLLLLMLMMMMMMMMMMMK',
+  'KMLLMEELLLLLLMMMMMMMDMMMMMMK',
+  'KMLMMMEELLLMMMMMMMDMMMMMMMMK',
+  '.KMLMMMMMLMMMMMMDMDMDMMMMMK.',
+  'KMMLMLMMMMMMMMMMMDMDMDMMMMMK',
+  'KMMMLMMMMMMMMMDMDMDMDMDMMMMK',
+  'KMDMMMMMMMMMMMMDMDDDDDDDMMMK',
+  'KMDMDMMMMMMMDMDDDDDDDDDDDMMK',
+  '.KMDMDMMMMMDDDDDDDDDEDDDDMK.',
+  '.KMMDMDMMDDDDDDDDDDEEDDDDDK.',
+  '..KMDMDDDDDDDDDDDDDDEDDDDK..',
+  '.KMDMDDDDDDDDDDDDDDDDDDDDDK.',
+  '..KMDDDDDDDDDDDDDDDDDDDDDK..',
+  '..KKMDDDDDDDKKDDDDDDDDDKKK..',
+  '....KKDDDDKK..KKDDDDKKK.....',
+  '......KKKK......KKKK........',
+  '..........KKKKKKKK..........',
+  '..........KEDDDMMK..........',
+  '..........KEDDDMMK..........',
+  '..........KEDDDMMK..........',
+  '..........KEDDDMMK..........',
+  '..........KEDDDMMK..........',
+  '.........KEEDDDMMMK.........',
+  '.........KEEDDDMMMK.........',
+  '........KEEDDDDMMMMK........',
+  '........KKKKKKKKKKKK........'
+];
+
+/* ---- AMERICAN SYCAMORE -------------------------------------
+   The giant of the five: the tallest thing he can plant, and
+   the only one whose trunk is drawn in the LIGHT tones, with
+   dark patches flaking off it. That pale trunk is the whole
+   point — it's how you know a sycamore from across a field. */
+const T_SYCAMORE = [
+  '....KKKK....KKKKK.........',
+  '..KKMLLMKK.KMLLLMKK.......',
+  '.KMLLLLLMKKMLLLLLMMKK.....',
+  'KMLLLSLLLMMLLLLMMMMMMK....',
+  'KMLLLLLLLLLLLMLMMMMMMMK...',
+  '.KMLLMLLLLLLMLMMMMMMMMMK..',
+  'KMLLMEELLLLMMMMMMMDMMMMMK.',
+  'KMLMMMEELLMMMMMMDMMMMMMMMK',
+  '.KMLMMMMLMMMMMDMDMDMMMMMK.',
+  'KMMLMLMMMMMMMDMDMDMDMMMMMK',
+  'KMMMMMMMMMMMDMDDDDDDDMMMMK',
+  'KMDMMMMMMMDMDDDDDDDDDDDMMK',
+  '.KMDMDMMMDDDDDDDDDEDDDDMK.',
+  'KMMDMDMMDDDDDDDDDEEDDDDDDK',
+  '.KMDMDMDDDDDDDDDDDEDDDDDK.',
+  '.KMMDMDDDDDDDDDDDDDDDDDDK.',
+  '..KMDMDDDDDDDDDDDDDDDDDK..',
+  '..KKMDDDDDDKKDDDDDDDDKKK..',
+  '....KKDDDDKK.KKDDDDKKK....',
+  '......KKKK.....KKKK.......',
+  '..........KKKKKK..........',
+  '..........KLLLDK..........',
+  '..........KMLLDK..........',
+  '..........KLSLDK..........',
+  '..........KLLDDK..........',
+  '..........KLLLDK..........',
+  '..........KMLLDK..........',
+  '..........KLLLDK..........',
+  '..........KLDLDK..........',
+  '..........KLMLDK..........',
+  '..........KLLLDK..........',
+  '..........KMLLDK..........',
+  '..........KLLDDK..........',
+  '..........KLLLDK..........',
+  '..........KLDLDK..........',
+  '..........KLLLDK..........',
+  '..........KMLLDK..........',
+  '.........KMLLLLDK.........',
+  '.........KLLSLLDK.........',
+  '........KMLLLLLLDK........',
+  '.......KMLLLLLDLLDK.......',
+  '.......KKKKKKKKKKKK.......'
+];
+
+/* ---- SHAGBARK HICKORY --------------------------------------
+   Narrow and tall. The whole point of it is the trunk: long
+   plates of bark peeling away, which is why its edges jut in
+   and out a pixel instead of running straight. */
+const T_HICKORY = [
+  '....KKKK........',
+  '..KKMLLMKKK.....',
+  '.KMLLLLLLMMKK...',
+  'KMLLSLLLLMMMMK..',
+  'KMLLLLLLLMLMMMK.',
+  '.KMLLLMLLMMMMMK.',
+  'KMLLMEELLMMMMMMK',
+  'KMLMMMEELMMMDMMK',
+  '.KMLMMMMLMMDMMK.',
+  'KMMLMLMMMMDMDMMK',
+  'KMMMMMMMDMDMDMMK',
+  'KMDMMMMDMDDDDDMK',
+  '.KMDMDMDDDDDDDK.',
+  'KMMDMDDDDDDEDDDK',
+  '.KMDMDDDDDEEDDK.',
+  '.KMMDMDDDDDEDDK.',
+  '..KMDMDDDDDDDK..',
+  '..KKMDDDDDDDKK..',
+  '....KKDDDDDKK...',
+  '......KKDKK.....',
+  '......KKKKKK....',
+  '......KEDDMK....',
+  '......KEDDMK....',
+  '.....KEEDDMK....',
+  '......KEDDMK....',
+  '......KEDDMK....',
+  '......KEDDMMK...',
+  '......KEDDMK....',
+  '.....KEEDDMK....',
+  '......KEDDMK....',
+  '......KEDDMMK...',
+  '......KEDDMK....',
+  '.....KEEDDMMK...',
+  '.....KEEDDDMMK..',
+  '....KEEDDDDMMMK.',
+  '....KKKKKKKKKKK.'
+];
+
+/* ---- EASTERN REDBUD ----------------------------------------
+   Small and low, leaning out sideways the way they do at a
+   woodland edge, and carrying its magenta blossom right along
+   the branches rather than only at the top. */
+const T_REDBUD = [
+  '.....KKKK....KKKK.....',
+  '...KKMLLMKKKKMLFMKK...',
+  '..KMLLLLFMMMLLLLLMMK..',
+  '.KMLLFLLLSLLLLMMFMMMK.',
+  'KMLLfLLLLLLLMLMMfMMMMK',
+  'KMLLMEELLLLMMMMMMMDMMK',
+  '.KMLMMEELMMMMMMDMMMMK.',
+  'KMMLMLMMMMMMMDMDMDMMMK',
+  'KMMMLMMFMMMMDMDMDMMMMK',
+  'KMDMMMMfMMDMDDDDDDDMMK',
+  'KMDMDMMMMDDDDDDDDDDDDK',
+  '.KMDMDMMMDDDDDDFDDDDK.',
+  '.KMMDMDMDDDDDDDfDDDDK.',
+  '..KMDMDDDDDDDDDDDDDK..',
+  '..KKMDDDDDKKKDDDDDKK..',
+  '....KKDDDKK..KKDDKK...',
+  '......KKKK.....KKK....',
+  '........KKKKKK........',
+  '........KEDDMK........',
+  '........KEDDMK........',
+  '........KEDDMK........',
+  '.......KEEDDMMK.......',
+  '.......KEEDDMMK.......',
+  '......KEEDDDMMMK......',
+  '......KEEDDDMMMK......',
+  '.....KEEDDDDMMMMK.....',
+  '.....KKKKKKKKKKKK.....'
+];
+
+/* ---- SERVICEBERRY ------------------------------------------
+   The slim one, and the only one that forks: a second stem
+   leans out of the trunk low down and runs to the ground
+   beside it. White flower, a few dark berries. */
+const T_SERVICEBERRY = [
+  '.....KKKKK.......',
+  '...KKMLLFMKKK....',
+  '..KMLLLLLLLMMKK..',
+  '.KMLLFLLSLLMMMMK.',
+  '.KMLLLLLLLMFMMMK.',
+  'KMLLLEELLLMMMMMMK',
+  'KMLMMMEELMMMMDMMK',
+  '.KMLMMMMFMMMDMMK.',
+  'KMMLMLMMMMMDMDMK.',
+  'KMMMMMMMMMDMDDDMK',
+  'KMDMMMFMMDDDDDDDK',
+  'KMDMDMMMDDDDDDDDK',
+  '.KMDMDMDDDDDFDDK.',
+  '.KMMDMDDDDDDDDDK.',
+  '..KMDDDDDDDDDDK..',
+  '..KKMDDDDDDDDKK..',
+  '....KKDDDDDKK....',
+  '.....KKKKKK......',
+  '.....KEDMK.......',
+  '.....KEDMK.......',
+  '....KEDMK........',
+  '....KEDMKKK......',
+  '....KEDMMDMK.....',
+  '....KEDMKKDMK....',
+  '....KEDMK.KDMK...',
+  '...KEDMK..KDMK...',
+  '...KEDMK..KDMK...',
+  '...KEDMK..KDMK...',
+  '..KEDDMK..KDMK...',
+  '..KEDDMMKKKDDMK..',
+  '..KEEDDMMMMDDMK..',
+  '..KKKKKKKKKKKKK..'
+];
+
+/* ---- the planting hole -------------------------------------
+   A little ring of turned earth waiting for something. It stays
+   under the tree once one is planted, so it reads as a mulch
+   ring and the spot is always findable. */
+const T_HOLE = [
+  '...KKKKKKKK...',
+  '.KKmmmmmmmmKK.',
+  'KmmdddddddmmmK',
+  'KmdddeeeddddmK',
+  'KmddeeeeeedddK',
+  'KmdddeeeeddmdK',
+  'KmmdddeddddmlK',
+  '.KmmdddddmllK.',
+  '..KKmmllllKK..',
+  '....KKKKKK....'
+];
+
+/* ---- the dedication plaque ---------------------------------
+   A small marker on a short stake at the foot of the tree. The
+   lines on it just mean "there are words here" — the actual
+   words are read with the button, not painted on. */
+const T_PLAQUE = [
+  '.KKKKKKKKK.',
+  'KLLLLLLLLMK',
+  'KLMMMMMMMMK',
+  'KLMLLLLLMMK',
+  'KLMLMMMLMMK',
+  'KLMLLLLLMMK',
+  'KLMMMMMMMMK',
+  'KDDDDDDDDDK',
+  '.KKKEDKKKK.',
+  '...KEDK....',
+  '...KEDK....',
+  '..KKKKKK...'
+];
 
 /* ============================================================
    Prairie Village — Stage 1: The Town
@@ -2130,6 +2590,121 @@ function seedById(id) { return SEEDS.find(s => s.id === id) || null; }
 
 const STAGE_NAMES = ['just planted', 'sprouting', 'growing', 'ready'];
 
+/* ============================================================
+   STAGE 4 — TREES AND DEDICATIONS
+   ------------------------------------------------------------
+   Trees are deliberately the OPPOSITE of the vegetable beds.
+   The garden is fussy and daily; a tree is slow and forgiving.
+
+     - Five native species, all available from the start.
+     - Three sizes: sapling, young, mature. Five real days at
+       each of the first two, so ten days from whip to full
+       size — slow enough that the world visibly matures over
+       weeks, fast enough that something changes in his first
+       week with the game.
+     - A SAPLING needs water, exactly as a real newly-planted
+       tree needs establishing: on a day it isn't watered it
+       simply doesn't grow, and on a hot day it looks thirsty.
+       It never dies and never goes backwards.
+     - Once it's past sapling it is on its own FOREVER. A week
+       away can't undo his trees. That's the point of them.
+     - Any tree can be given a dedication, in his own words, at
+       any time. It's written into the save and never expires.
+   ============================================================ */
+
+const TREE_DAYS_PER_STAGE = 5;
+
+const TREES = [
+  { id: 'buroak', name: 'Bur Oak', form: 'round',
+    blurb: 'Broad, tough, and older than the town.' },
+  { id: 'redbud', name: 'Eastern Redbud', form: 'round',
+    blurb: 'Small and low, magenta along every branch.' },
+  { id: 'serviceberry', name: 'Serviceberry', form: 'upright',
+    blurb: 'Slim and forked. First to flower in spring.' },
+  { id: 'hickory', name: 'Shagbark Hickory', form: 'upright',
+    blurb: 'Narrow and tall, with bark that peels in plates.' },
+  { id: 'sycamore', name: 'American Sycamore', form: 'upright',
+    blurb: 'The giant. You can spot its pale trunk for miles.' }
+];
+function treeById(id) { return TREES.find(t => t.id === id) || null; }
+
+const TREE_STAGE_NAMES = ['a sapling', 'young', 'fully grown'];
+
+/* ---- where a tree can go -----------------------------------
+   Prepared planting spots, counted in map squares: three in his
+   own backyard and six out on the lawn at Harmon Park. Each one
+   is a small ring of turned earth, and each one is solid, so he
+   walks up to it exactly the way he walks up to a garden bed
+   and can never end up standing inside his own tree.
+
+   Free planting anywhere on the grass is the obvious next step
+   after the reveal; these fixed spots are the version that
+   cannot possibly wall him into a corner. */
+const TREE_SPOTS = {
+  /* The backyard is the strip ABOVE the house, not below it — the
+     house itself is 13 squares wide and stands on row 21, so the
+     middle of the lower yard is roof. These three sit in the two
+     clear side strips instead: one up by the top fence, two down
+     level with the far corners of the patio. */
+  home: [
+    { col: 6.5, row: 4.5 },
+    { col: 7, row: 17 },
+    { col: 29, row: 17 }
+  ],
+  /* Three down the west lawn and three down the east, leaving the
+     middle of the park to the big oak. Anything planted under its
+     canopy would simply be hidden behind it. */
+  park: [
+    { col: 12, row: 10.5 },
+    { col: 11, row: 15 },
+    { col: 12, row: 19.5 },
+    { col: 28, row: 17 },
+    { col: 30.5, row: 20.5 },
+    { col: 26, row: 22.5 }
+  ]
+};
+/* How solid a planted spot is, in screen pixels. Sized to the
+   trunk, not the canopy — so he can tuck in under the leaves
+   exactly like he can with every other tree in the game. */
+const TREE_BLOCK = [34, 16];
+
+function treeSpotKey(areaKey, i) { return areaKey + ':' + i; }
+
+/* ---- a brand-new tree, the moment it goes in the ground ---- */
+function newTree(speciesId, dayKeyStr) {
+  return {
+    sp: speciesId,   // which species
+    st: 0,           // 0 sapling, 1 young, 2 mature
+    pr: 0,           // days of growth banked toward the next size
+    wat: false,      // watered today?
+    th: false,       // thirsty — went through a hot day dry
+    ded: null,       // his dedication, or nothing
+    pd: dayKeyStr    // the day he planted it
+  };
+}
+
+/* ---- what one finished day does to one tree ---------------- */
+function endTreeDay(t, weather) {
+  if (t.st >= 2) return;                 // fully grown; nothing left to do
+  if (t.st === 0) {
+    // still establishing — it only grows on a day it got water
+    if (t.wat) { t.pr++; t.th = false; }
+    else if (weather === 'sunny') { t.th = true; }
+  } else {
+    t.pr++;                              // established: grows on its own
+  }
+  if (t.pr >= TREE_DAYS_PER_STAGE) { t.pr = 0; t.st++; t.th = false; }
+}
+
+/* A date written the way a plaque would write it. */
+function prettyDay(key) {
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  const p = String(key || '').split('-');
+  if (p.length !== 3) return '';
+  return Number(p[2]) + ' ' + MONTHS[Number(p[1]) - 1] + ' ' + p[0];
+}
+
 /* ---- where the beds are ------------------------------------
    Six raised beds in the patch of back lawn that's been left
    empty since Stage 1 — two rows of three. Counted in map
@@ -2144,11 +2719,15 @@ const PLOT_TILES_W = 2;
 /* ---- a brand-new, empty garden ----------------------------- */
 function newGarden() {
   return {
-    v: 1,
+    v: 2,
     day: null,
     plots: GARDEN_PLOTS.map(() => ({
       seed: null, stage: 0, wilted: false, watered: false, care: 0, picked: 0
-    }))
+    })),
+    // Stage 4. Kept as a lookup rather than a list, keyed by
+    // "which area : which spot", so adding more planting spots
+    // later can never shuffle the trees he already has.
+    trees: {}
   };
 }
 
@@ -2159,6 +2738,8 @@ function beginDay(g, key) {
   g.day = key;
   const wet = weatherFor(key) === 'rainy';
   g.plots.forEach(p => { p.watered = wet; });
+  // Rain waters his saplings too, of course.
+  Object.keys(g.trees || {}).forEach(k => { g.trees[k].wat = wet; });
 }
 
 /* ---- what one finished day does to one bed -----------------
@@ -2207,6 +2788,7 @@ function catchUp(g, todayKey) {
   while (g.day !== todayKey && passed < 400) {
     const w = weatherFor(g.day);
     g.plots.forEach(p => endDay(p, w));
+    Object.keys(g.trees || {}).forEach(k => endTreeDay(g.trees[k], w));
     beginDay(g, nextDayKey(g.day));
     passed++;
   }
@@ -2226,13 +2808,30 @@ function catchUp(g, todayKey) {
    refuse to write — in that case the game still plays perfectly
    for the session, it just forgets afterwards. */
 const SAVE_KEY = 'prairie-village-save-v1';
+const MAX_DEDICATION = 60;
+
+/* Trims a dedication down to something a plaque could actually
+   hold, and strips out line breaks and stray control characters
+   so it can never break the message box it's shown in. */
+function cleanDedication(text) {
+  const s = String(text == null ? '' : text)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s.slice(0, MAX_DEDICATION);
+}
 
 function loadGarden() {
   try {
     const raw = window.localStorage.getItem(SAVE_KEY);
     if (!raw) return newGarden();
     const data = JSON.parse(raw);
-    if (!data || data.v !== 1 || !Array.isArray(data.plots)) return newGarden();
+    // Stage 4 bumped the save to version 2 by adding trees. A
+    // version 1 save (his garden as it stands today) is read
+    // exactly as before and simply arrives with no trees yet —
+    // nothing he has already grown is lost.
+    if (!data || (data.v !== 1 && data.v !== 2) || !Array.isArray(data.plots)) return newGarden();
     const g = newGarden();
     g.day = typeof data.day === 'string' ? data.day : null;
     for (let i = 0; i < g.plots.length; i++) {
@@ -2246,6 +2845,26 @@ function loadGarden() {
         care: Math.max(0, Math.min(2, s.care | 0)),
         picked: Math.max(0, s.picked | 0)
       };
+    }
+    const t = data.trees;
+    if (t && typeof t === 'object') {
+      Object.keys(t).forEach(k => {
+        const s = t[k];
+        if (!s || !treeById(s.sp)) return;
+        g.trees[k] = {
+          sp: s.sp,
+          st: Math.max(0, Math.min(2, s.st | 0)),
+          // clamped to one LESS than a full stage: a legitimate save
+          // can never hold a full bank (it would already have grown),
+          // so this stops a mangled save from handing out a free
+          // growth stage on a day the sapling wasn't even watered
+          pr: Math.max(0, Math.min(TREE_DAYS_PER_STAGE - 1, s.pr | 0)),
+          wat: !!s.wat,
+          th: !!s.th,
+          ded: s.ded ? cleanDedication(s.ded) : null,
+          pd: typeof s.pd === 'string' ? s.pd : null
+        };
+      });
     }
     return g;
   } catch (e) {
@@ -2279,6 +2898,7 @@ class AreaData {
     this.solids = [];
     this.exits = [];
     this.signs = [];
+    this.treeSpots = [];
   }
   set(x, y, t) {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
@@ -2338,6 +2958,17 @@ class AreaData {
       x: col * T, y: row * T, w: w * T, h: h * T,
       to, sx: spawnCol * T, sy: spawnRow * T
     });
+  }
+
+  /* A prepared tree-planting spot: a ring of turned earth, given
+     as the middle of its base in map squares. It's solid — sized
+     to a trunk, not a canopy — so he walks up to it the same way
+     he walks up to a garden bed, and can never end up standing
+     inside his own tree. */
+  treeSpot(cx, baseRow) {
+    this.treeSpots.push({ i: this.treeSpots.length, x: cx * T, y: baseRow * T });
+    this.solid(cx * T - TREE_BLOCK[0] / 2, baseRow * T - TREE_BLOCK[1],
+               TREE_BLOCK[0], TREE_BLOCK[1]);
   }
 
   /* A sign whose words appear at the bottom of the screen when he
@@ -2408,6 +3039,10 @@ const AREAS = {
       // the forecast sign, standing at the near corner of the garden
       a.prop('weathersign', 9.2, 7.6);
       a.signs.push({ x: 9.2 * T, y: 7.6 * T, weather: true });
+
+      // STAGE 4 — three planting spots on the open back lawn, well
+      // clear of the beds, the patio and the driveway
+      TREE_SPOTS.home.forEach(s => a.treeSpot(s.col, s.row));
 
       // out front
       a.prop('bush', 11.6, 21.9);
@@ -2529,6 +3164,11 @@ const AREAS = {
       a.prop('bush', 26, 10.5);
       a.prop('bush', 18, 10.5);
 
+      // STAGE 4 — six planting spots spread across the open lawn,
+      // clear of the oak's shade, the shed, the benches and the
+      // loop path. This is the town's job: filling the park in.
+      TREE_SPOTS.park.forEach(s => a.treeSpot(s.col, s.row));
+
       // woods around the edge
       const woods = [];
       for (let c = 2; c <= 41; c += 3) {
@@ -2580,9 +3220,12 @@ class PrairieScene extends Phaser.Scene {
     this.weatherToday = weatherFor(this.garden.day);
     this.weatherTomorrow = weatherFor(nextDayKey(this.garden.day));
     this.activePlot = -1;
+    this.activeTree = -1;
     this.menuOpen = false;
     this.plotViews = [];
+    this.treeViews = [];
     this.signIcons = [];
+    this.dedicationBox = null;
 
     this.buildArt();
     this.buildPlayer();
@@ -2604,7 +3247,11 @@ class PrairieScene extends Phaser.Scene {
     this.input.on('pointerupoutside', (p) => this.onUp(p));
 
     this.scale.on('resize', () => {
-      if (this.menuOpen) this.closeSeedMenu();
+      // Only tidy away a menu drawn INSIDE the game. The dedication
+      // box is a real text box living above the game, and it looks
+      // after itself — closing it here would yank the keyboard away
+      // mid-sentence when the phone rotates.
+      if (this.menuObjects) this.closeChoiceMenu();
       this.layoutControls();
     });
     this.buildWeatherLook();
@@ -2804,6 +3451,46 @@ class PrairieScene extends Phaser.Scene {
         const g = gridSize(pair[1]);
         this.makeTexture(pair[0], g.w, g.h, c => drawPixels(c, pair[1], ICON_PAL));
       });
+
+    /* ---- Stage 4: the trees ----
+       Straight through the same six roles as every other living
+       thing. The two flowering species get their real blossom
+       colour, nudged a quarter of the way toward whatever light
+       the world is in — exactly the treatment the garden flowers
+       already get, so a redbud is always pink but goes quiet at
+       dusk along with everything else. */
+    const treePal = { K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L, S: pal.S };
+
+    [['tree_sapling', T_SAPLING],
+     ['tree_young_round', T_YOUNG_ROUND],
+     ['tree_young_upright', T_YOUNG_UPRIGHT]].forEach(([key, rows]) => {
+      const sz = gridSize(rows);
+      this.makeTexture(key, sz.w, sz.h, c => drawPixels(c, rows, treePal));
+    });
+
+    const TREE_GRIDS = {
+      buroak: T_BUROAK, redbud: T_REDBUD, serviceberry: T_SERVICEBERRY,
+      hickory: T_HICKORY, sycamore: T_SYCAMORE
+    };
+    const TREE_BLOSSOM = {
+      redbud:       { F: '#d47ab8', f: '#a3468c' },
+      serviceberry: { F: '#f7f2e4', f: '#8d3a3a' }
+    };
+    TREES.forEach(t => {
+      const tp = Object.assign({}, treePal);
+      const b = TREE_BLOSSOM[t.id];
+      if (b) { tp.F = lit(b.F); tp.f = lit(b.f); }
+      const rows = TREE_GRIDS[t.id];
+      const sz = gridSize(rows);
+      this.makeTexture('tree_' + t.id, sz.w, sz.h, c => drawPixels(c, rows, tp));
+    });
+
+    // the ring of turned earth, and the little plaque
+    const HOLE_PAL = { K: pal.K, m: pal.D, d: pal.E, e: pal.K, l: pal.L };
+    const hsz = gridSize(T_HOLE);
+    this.makeTexture('treehole', hsz.w, hsz.h, c => drawPixels(c, T_HOLE, HOLE_PAL));
+    const qsz = gridSize(T_PLAQUE);
+    this.makeTexture('plaque', qsz.w, qsz.h, c => drawPixels(c, T_PLAQUE, treePal));
   }
 
   /* Henri gets his own small spritesheet: 9 frames (3 directions x
@@ -2822,7 +3509,11 @@ class PrairieScene extends Phaser.Scene {
     const tex = this.textures.createCanvas('henri', specs.length * HW, HH);
     const ctx = tex.context || tex.getContext();
     specs.forEach((s, i) => {
-      const frame = this.smallCanvasOutlined(HW, HH, c => drawHenri(c, s[1], s[2], s[3], pal), pal.K);
+      // The grids carry their own K outline, so no outline pass here —
+      // running one would fatten his line to two pixels.
+      const frame = document.createElement('canvas');
+      frame.width = HW; frame.height = HH;
+      drawHenri(frame.getContext('2d'), s[1], s[2], s[3], pal);
       ctx.drawImage(frame, i * HW, 0);
     });
     tex.refresh();
@@ -2876,7 +3567,13 @@ class PrairieScene extends Phaser.Scene {
     if (this.signIcons) this.signIcons.forEach(i => i.destroy());
     this.signIcons = [];
     if (this.plotGlow) { this.plotGlow.destroy(); this.plotGlow = null; }
+    if (this.treeViews) this.treeViews.forEach(v => {
+      v.hole.destroy(); v.tree.destroy(); v.plaque.destroy();
+    });
+    this.treeViews = [];
+    if (this.treeGlow) { this.treeGlow.destroy(); this.treeGlow = null; }
     this.activePlot = -1;
+    this.activeTree = -1;
     this.actionVerbShown = null;
     if (this.textures.exists('ground')) this.textures.remove('ground');
 
@@ -2903,6 +3600,7 @@ class PrairieScene extends Phaser.Scene {
     });
 
     if (key === 'home') this.buildGardenViews(a);
+    if (a.treeSpots.length) this.buildTreeViews(a, key);
 
     const W = a.w * T, H = a.h * T;
     this.physics.world.setBounds(0, 0, W, H);
@@ -3116,7 +3814,9 @@ class PrairieScene extends Phaser.Scene {
 
     // Stage 3: if he's standing at a bed, the button does the
     // gardening rather than nothing at all.
-    if (this.activePlot >= 0) this.doPlotAction(this.activePlot);
+    if (this.activePlot >= 0) { this.doPlotAction(this.activePlot); return; }
+    // Stage 4: and if he's at a planting spot, it does the trees.
+    if (this.activeTree >= 0) this.doTreeAction(this.activeTree);
   }
 
   resolveDirection(vx, vy) {
@@ -3174,7 +3874,10 @@ class PrairieScene extends Phaser.Scene {
     this.dayCheck = (this.dayCheck || 0) - delta;
     if (this.dayCheck <= 0) { this.dayCheck = 4000; this.checkNewDay(); }
 
+    // A garden bed always wins over a planting spot, but the two
+    // are far enough apart in both areas that it never comes up.
     this.activePlot = this.nearestPlot();
+    this.activeTree = (this.activePlot >= 0) ? -1 : this.nearestTreeSpot();
     this.updatePlotHint();
     this.stepRain(delta);
 
@@ -3324,7 +4027,19 @@ class PrairieScene extends Phaser.Scene {
         this.plotGlow.setVisible(false);
       }
     }
-    const verb = i >= 0 ? this.plotVerb(i) : '';
+
+    // and the same soft outline for a tree-planting spot
+    if (this.treeGlow) {
+      if (this.activeTree >= 0) {
+        const v = this.treeViews[this.activeTree];
+        this.treeGlow.setPosition(v.x, v.y - 7).setVisible(true);
+      } else {
+        this.treeGlow.setVisible(false);
+      }
+    }
+
+    let verb = i >= 0 ? this.plotVerb(i) : '';
+    if (!verb && this.activeTree >= 0) verb = this.treeVerb(this.activeTree);
     if (this.actionVerbShown === verb) return;
     this.actionVerbShown = verb;
     this.actionLabel.setText(verb).setVisible(!!verb);
@@ -3368,6 +4083,392 @@ class PrairieScene extends Phaser.Scene {
     line += '.';
     if (p.watered) line += ' Watered today.';
     this.toast(line);
+  }
+
+  /* ---------------------------------------------------------
+     STAGE 4 — THE TREES
+     ------------------------------------------------------------
+     Nine prepared spots: three on his back lawn, six out at
+     Harmon Park. The growing rules live up in the rules block
+     with the weather; everything down here is showing them on
+     screen and listening for his thumb.
+     --------------------------------------------------------- */
+
+  /* The ring of earth, the tree standing in it, and the plaque at
+     its foot — one set per spot. Made once, when he walks in. */
+  buildTreeViews(a, areaKey) {
+    a.treeSpots.forEach(sp => {
+      // The ring is flat on the ground, so it's pinned low in the
+      // draw order and everything — him, Henri, the tree — passes
+      // in front of it.
+      const hole = this.add.image(sp.x, sp.y, 'treehole')
+        .setOrigin(0.5, 1).setScale(SCALE).setDepth(2);
+      const tree = this.add.image(sp.x, sp.y, 'tree_sapling')
+        .setOrigin(0.5, 1).setScale(SCALE).setDepth(sp.y).setVisible(false);
+      const plaque = this.add.image(sp.x + 23, sp.y + 3, 'plaque')
+        .setOrigin(0.5, 1).setScale(SCALE).setDepth(sp.y + 3).setVisible(false);
+      this.treeViews.push({
+        key: treeSpotKey(areaKey, sp.i), x: sp.x, y: sp.y, hole, tree, plaque
+      });
+    });
+
+    this.treeGlow = this.add.ellipse(0, 0, TREE_BLOCK[0] + 22, 28, 0xfff2c4, 0.10)
+      .setVisible(false).setDepth(3);
+    this.treeGlow.setStrokeStyle(3, 0xfff2c4, 0.85);
+
+    this.refreshTrees();
+  }
+
+  /* Redraw every spot from the saved numbers. Called after any
+     change, so there's only ever one place that decides what a
+     tree looks like. */
+  refreshTrees() {
+    if (!this.treeViews || !this.treeViews.length) return;
+    this.treeViews.forEach(v => {
+      const t = this.garden.trees[v.key];
+      if (!t) { v.tree.setVisible(false); v.plaque.setVisible(false); return; }
+
+      const sp = treeById(t.sp);
+      let key;
+      if (t.st === 0) key = 'tree_sapling';
+      else if (t.st === 1) key = (sp.form === 'round') ? 'tree_young_round' : 'tree_young_upright';
+      else key = 'tree_' + sp.id;
+
+      v.tree.setTexture(key).setVisible(true);
+      // a thirsty sapling goes the same grey-green a wilted
+      // vegetable does — it's the one visual language for "this
+      // wants water"
+      v.tree.setTint(t.th ? 0x9aa07e : 0xffffff);
+      v.plaque.setVisible(!!t.ded);
+    });
+  }
+
+  /* Which planting spot is he standing at? -1 for none. */
+  nearestTreeSpot() {
+    if (!this.treeViews || !this.treeViews.length) return -1;
+    let best = -1, bestD = 96;
+    this.treeViews.forEach((v, i) => {
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, v.x, v.y - 8);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  /* What the one action button will do if he presses it now. */
+  treeVerb(i) {
+    const t = this.garden.trees[this.treeViews[i].key];
+    if (!t) return 'PLANT';
+    if (t.st === 0 && !t.wat) return 'WATER';
+    if (!t.ded) return 'DEDICATE';
+    return 'READ';
+  }
+
+  doTreeAction(i) {
+    const v = this.treeViews[i];
+    const t = this.garden.trees[v.key];
+    const verb = this.treeVerb(i);
+
+    if (verb === 'PLANT') { this.openTreeMenu(v.key); return; }
+
+    if (verb === 'WATER') {
+      t.wat = true; t.th = false;
+      this.commitTrees();
+      this.toast('Watered the ' + treeById(t.sp).name.toLowerCase() + ' sapling.');
+      return;
+    }
+
+    if (verb === 'DEDICATE') { this.openDedicationBox(v.key); return; }
+
+    // READ — his own words, with a way back in to fix a typo,
+    // because a memorial he can't correct would be a cruel thing
+    // to build
+    this.openChoiceMenu({
+      title: '“' + t.ded + '”',
+      subtitle: treeById(t.sp).name +
+                (t.pd ? '  ·  planted ' + prettyDay(t.pd) : ''),
+      rows: [{ label: 'Change the words', pick: () => this.openDedicationBox(v.key) }],
+      cancel: 'Close'
+    });
+  }
+
+  openTreeMenu(key) {
+    this.openChoiceMenu({
+      title: 'What shall we plant here?',
+      subtitle: 'Five natives · all of them do well in Kansas',
+      rows: TREES.map(t => ({
+        label: t.name,
+        sub: t.blurb,
+        pick: () => this.plantTree(key, t.id)
+      })),
+      cancel: 'Never mind'
+    });
+  }
+
+  plantTree(key, speciesId) {
+    this.garden.trees[key] = newTree(speciesId, this.garden.day);
+    // If it's raining right now, the rain waters the new sapling the
+    // moment it goes in — exactly as a seed planted today lands in
+    // soil the rain already wet. Without this, a tree planted in the
+    // rain would ask for the watering can while the sky did the job.
+    if (this.weatherToday === 'rainy') this.garden.trees[key].wat = true;
+    this.commitTrees();
+    this.toast('Planted a ' + treeById(speciesId).name.toLowerCase() +
+               '. Keep it watered while it takes.', 3000);
+
+    /* The dedication is offered, never forced — and it's offered as
+       a question first rather than throwing the keyboard straight
+       up at him. That's also what makes the keyboard work: on a
+       phone it will only open in answer to a tap. */
+    this.time.delayedCall(1100, () => {
+      if (this.menuOpen || !this.garden.trees[key]) return;
+      this.openChoiceMenu({
+        title: 'Dedicate this tree?',
+        subtitle: treeById(speciesId).name,
+        rows: [{
+          label: 'Write a few words',
+          sub: 'A small plaque at its foot',
+          pick: () => this.openDedicationBox(key)
+        }],
+        cancel: 'Not now'
+      });
+    });
+  }
+
+  commitTrees() {
+    saveGarden(this.garden);
+    this.refreshTrees();
+    this.actionVerbShown = null;
+  }
+
+  /* ---- his own words ---------------------------------------
+     This is the one place in the whole game that isn't drawn by
+     Phaser. It's a real text box laid over the top, because a
+     real text box is the only thing that will bring up the
+     phone's keyboard. Everything else about it — the colours,
+     the border — is made to match the panels around it. */
+  openDedicationBox(key) {
+    if (this.menuOpen) return;
+    const t = this.garden.trees[key];
+    if (!t) return;
+
+    this.menuOpen = true;
+    this.player.body.setVelocity(0, 0);
+    this.stickPointerId = null;
+    this.stickVector.set(0, 0);
+    this.stickBase.setVisible(false);
+    this.stickKnob.setVisible(false);
+    // hand the keyboard over to the text box
+    if (this.input.keyboard) this.input.keyboard.enabled = false;
+
+    const font = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText =
+      'position:fixed;top:0;left:0;right:0;bottom:0;z-index:60;display:flex;' +
+      'align-items:center;justify-content:center;background:rgba(18,12,6,0.78);' +
+      'padding:12px;box-sizing:border-box;touch-action:auto;' +
+      '-webkit-user-select:auto;user-select:auto;font-family:' + font + ';';
+
+    const panel = document.createElement('div');
+    panel.style.cssText =
+      'background:#2b1d11;border:3px solid #cb9f63;border-radius:10px;' +
+      'padding:16px 18px;width:430px;max-width:92vw;box-sizing:border-box;color:#f6ecd6;';
+
+    const h1 = document.createElement('div');
+    h1.textContent = t.ded ? 'Change the words' : 'Dedicate this tree';
+    h1.style.cssText = 'font-size:19px;margin-bottom:3px;';
+
+    const h2 = document.createElement('div');
+    h2.textContent = treeById(t.sp).name +
+      (t.pd ? '  ·  planted ' + prettyDay(t.pd) : '');
+    h2.style.cssText = 'font-size:12px;color:#c9ab82;margin-bottom:12px;';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = MAX_DEDICATION;
+    input.value = t.ded || '';
+    input.placeholder = 'For someone, or something, or nothing at all';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('enterkeyhint', 'done');
+    input.style.cssText =
+      'width:100%;box-sizing:border-box;font-family:inherit;font-size:17px;' +
+      'padding:11px 12px;border-radius:7px;border:2px solid #8a6b41;' +
+      'background:#3f2c19;color:#f6ecd6;outline:none;touch-action:auto;' +
+      '-webkit-user-select:text;user-select:text;';
+
+    const count = document.createElement('div');
+    count.style.cssText =
+      'font-size:11px;color:#9c805a;margin:6px 2px 12px;text-align:right;';
+    const tick = () => {
+      count.textContent = (MAX_DEDICATION - input.value.length) + ' characters left';
+    };
+    tick();
+    input.addEventListener('input', tick);
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:10px;';
+    const mkBtn = (label, primary) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.style.cssText =
+        'flex:1;font-family:inherit;font-size:16px;padding:12px 8px;' +
+        'border-radius:7px;cursor:pointer;-webkit-tap-highlight-color:transparent;' +
+        'border:2px solid ' + (primary ? '#cb9f63' : '#6b5231') + ';' +
+        'background:' + (primary ? '#4a3419' : '#241809') + ';' +
+        'color:' + (primary ? '#f6ecd6' : '#c9ab82') + ';';
+      return b;
+    };
+    const skip = mkBtn(t.ded ? 'Leave it as it is' : 'Not now', false);
+    const save = mkBtn('Put up the plaque', true);
+    row.appendChild(skip);
+    row.appendChild(save);
+
+    panel.appendChild(h1);
+    panel.appendChild(h2);
+    panel.appendChild(input);
+    panel.appendChild(count);
+    panel.appendChild(row);
+    wrap.appendChild(panel);
+    document.body.appendChild(wrap);
+
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      try { input.blur(); } catch (e) {}
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this.dedicationBox = null;
+      this.menuOpen = false;
+      this.actionVerbShown = null;
+      if (this.input.keyboard) this.input.keyboard.enabled = true;
+    };
+    const commit = () => {
+      const words = cleanDedication(input.value);
+      const tree = this.garden.trees[key];
+      close();
+      if (!tree) return;
+      tree.ded = words || null;
+      this.commitTrees();
+      this.toast(words
+        ? 'The plaque reads: “' + words + '”'
+        : 'No plaque for now — the tree grows all the same.', 3600);
+    };
+
+    save.addEventListener('click', commit);
+    skip.addEventListener('click', close);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    });
+    // tapping the dark surround is the same as saying "not now"
+    wrap.addEventListener('pointerdown', e => { if (e.target === wrap) close(); });
+
+    this.dedicationBox = { wrap: wrap, close: close };
+
+    /* Called straight out of the tap that opened this, which is
+       the one thing that persuades a phone to slide its keyboard
+       up on its own. If it doesn't, he can still tap the box. */
+    try { input.focus(); } catch (e) {}
+  }
+
+  /* ---- a plain list of choices over a dimmed screen ---------
+     The same look as the seed list, but general enough to serve
+     the species list, the "dedicate this?" question, and reading
+     a plaque back. */
+  openChoiceMenu(opts) {
+    if (this.menuOpen) return;
+    this.menuOpen = true;
+    // A quarter-second where it ignores taps, so the same quick jab
+    // that opened it can't also pick something.
+    this.menuReadyAt = this.time.now + 250;
+
+    this.player.body.setVelocity(0, 0);
+    this.stickPointerId = null;
+    this.stickVector.set(0, 0);
+    this.stickBase.setVisible(false);
+    this.stickKnob.setVisible(false);
+
+    const D = 20000;
+    const w = this.scale.width, h = this.scale.height;
+    const font = '-apple-system, sans-serif';
+    const objs = [];
+
+    const veil = this.add.rectangle(w / 2, h / 2, w * 2, h * 2, 0x120c06, 0.74)
+      .setScrollFactor(0).setDepth(D).setInteractive();
+    objs.push(veil);
+
+    const nRows = opts.rows.length + 1;
+    const head = opts.subtitle ? 78 : 56;
+    const rowH = Math.max(32, Math.min(52, Math.floor((h - 56 - head) / nRows)));
+    const panelW = Math.min(380, w - 36);
+    const panelH = head + nRows * rowH + 12;
+    const px = Math.round(w / 2), py = Math.round(h / 2);
+    const top = py - panelH / 2;
+
+    const panel = this.add.rectangle(px, py, panelW, panelH, 0x2b1d11, 0.98)
+      .setScrollFactor(0).setDepth(D + 1);
+    panel.setStrokeStyle(3, 0xcb9f63, 0.95);
+    objs.push(panel);
+
+    objs.push(this.add.text(px, top + 28, opts.title, {
+      fontFamily: font, fontSize: '19px', color: '#f6ecd6', align: 'center',
+      wordWrap: { width: panelW - 36 }
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2));
+
+    if (opts.subtitle) {
+      objs.push(this.add.text(px, top + 56, opts.subtitle, {
+        fontFamily: font, fontSize: '13px', color: '#c9ab82', align: 'center'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2));
+    }
+
+    opts.rows.forEach((r, i) => {
+      const ry = Math.round(top + head + i * rowH + rowH / 2);
+      const btn = this.add.rectangle(px, ry, panelW - 26, rowH - 6, 0x3f2c19, 1)
+        .setScrollFactor(0).setDepth(D + 2).setInteractive();
+      btn.setStrokeStyle(2, 0x8a6b41, 0.9);
+      btn.on('pointerdown', () => {
+        if (this.time.now < this.menuReadyAt) return;
+        this.closeChoiceMenu();
+        r.pick();
+      });
+      objs.push(btn);
+
+      // the little describing line only appears if the row is
+      // tall enough to hold it comfortably
+      const withSub = !!r.sub && rowH >= 44;
+      objs.push(this.add.text(px, withSub ? ry - 9 : ry, r.label, {
+        fontFamily: font, fontSize: '17px', color: '#f6ecd6'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+      if (withSub) {
+        objs.push(this.add.text(px, ry + 11, r.sub, {
+          fontFamily: font, fontSize: '11px', color: '#b39468'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+      }
+    });
+
+    const cy = Math.round(top + head + opts.rows.length * rowH + rowH / 2);
+    const cancel = this.add.rectangle(px, cy, panelW - 26, rowH - 6, 0x241809, 1)
+      .setScrollFactor(0).setDepth(D + 2).setInteractive();
+    cancel.setStrokeStyle(2, 0x6b5231, 0.9);
+    cancel.on('pointerdown', () => {
+      if (this.time.now < this.menuReadyAt) return;
+      this.closeChoiceMenu();
+    });
+    objs.push(cancel);
+    objs.push(this.add.text(px, cy, opts.cancel || 'Never mind', {
+      fontFamily: font, fontSize: '16px', color: '#c9ab82'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+
+    this.menuObjects = objs;
+  }
+
+  closeChoiceMenu() {
+    if (!this.menuObjects) return;
+    this.menuOpen = false;
+    this.menuObjects.forEach(o => o.destroy());
+    this.menuObjects = null;
+    this.actionVerbShown = null;
   }
 
   /* ---- picking a seed --------------------------------------
@@ -3494,6 +4595,7 @@ class PrairieScene extends Phaser.Scene {
     this.weatherTomorrow = weatherFor(nextDayKey(this.garden.day));
     saveGarden(this.garden);
     this.refreshGarden();
+    this.refreshTrees();
     this.refreshSignIcons();
     this.applyWeatherLook();
     this.actionVerbShown = null;
