@@ -1748,7 +1748,8 @@ const BED_ROWS = [
 
 /* ---- the plants --------------------------------------------
    Each one is drawn once, small. Letters:
-     K outline    D dark leaf   M mid leaf   L light leaf
+     K outline    E deep shadow   D dark leaf
+     M mid leaf   L light leaf    S spark (highlight)
      w a wooden pole (green beans climb one)
      d, e  turned soil (used by the just-planted mounds)
      F flower/fruit    f its shadow
@@ -1757,7 +1758,14 @@ const BED_ROWS = [
    a real color of their own rather than a palette role — a
    purple coneflower has to be purple. They still get nudged
    toward whatever light the world is in, so they sit down at
-   dusk with everything else. */
+   dusk with everything else.
+
+   Aug 4: the six full-grown species below (coneflower, Susan,
+   milkweed, blazing star, tomato, beans) were redrawn in the
+   bumpier leaf-clump style — GROUP 4 of APPROVED_SPRITES.md,
+   copied in verbatim. The new grids build their flower centres
+   out of E and f rather than C/c, so C and c are now only kept
+   in the palette for safety; nothing draws with them. */
 
 /* Stage 1 of 4 — just planted. Little mounds of turned soil. */
 const P_SEED = [
@@ -1792,182 +1800,171 @@ const P_SPROUT_VEG = [
    tell apart at a glance across the yard. */
 
 const P_CONEFLOWER_GROW = [
-  '...K...',
-  '..KLK..',
-  '..KMK..',
-  '.KLMK..',
-  'KLLMK..',
-  '.KKMK..',
-  '..KMLK.',
-  '..KMLLK',
-  '..KMKK.',
-  '..KDK..',
-  '..KKK..'
+  '....KKK....',
+  '...KLfLK...',
+  '....KLK....',
+  '.KK.KLK.KK.',
+  'KLLKKLKKDDK',
+  'KLMLKLKLDMK',
+  '.KLLKLKDDK.',
+  '..KKKLKKK..',
+  '....KMK....',
+  '....KKK....'
 ];
 const P_CONEFLOWER_BLOOM = [
-  '...KKK...',
-  '..KCCCK..',
-  '.KCcccCK.',
-  'KFCcccCFK',
-  'KFfCCCfFK',
-  'KFFfffFFK',
-  '.KFFFFFK.',
-  '..KFFFK..',
-  '...KKK...',
-  '...KMK...',
-  '..KLMK...',
-  '.KLMMK...',
-  '...KMLK..',
-  '...KMK...',
-  '...KKK...'
+  '.....KKK.....',
+  '....KEEfK....',
+  '..KKfEEfKK...',
+  '.KFFKffKFFK..',
+  'KFfK.KLK.KFfK',
+  'KffK.KLK.KffK',
+  '.KK..KLK..KK.',
+  '..KK.KLK.KK..',
+  '.KLLKKLKKDDK.',
+  '..KLLKLKDDK..',
+  '...KKKMKKK...',
+  '.....KMK.....',
+  '.....KKK.....'
 ];
 
 const P_SUSAN_GROW = [
-  '...KKK...',
-  '..KLLK...',
-  '.KLMMLK..',
-  'KLMMMMLK.',
-  '.KMMDMMK.',
-  '..KMDMK..',
-  '..KMDMK..',
-  '...KDK...',
-  '...KKK...'
+  '....KKK....',
+  '...KLLLK...',
+  '....KLK....',
+  '..KKKLKKK..',
+  '.KLLKLKDDK.',
+  'KLLLKLKKDDK',
+  'KLMLKLKDMDK',
+  '.KKKKMKKKK.',
+  '....KKK....'
 ];
 const P_SUSAN_BLOOM = [
-  '...KKKKK...',
-  '..KFFFFFK..',
-  '.KFFfffFFK.',
-  'KFFfcccfFFK',
-  'KFffcccffFK',
-  'KFFfcccfFFK',
-  '.KFFfffFFK.',
-  '..KFFFFFK..',
-  '...KKKKK...',
-  '....KMK....',
-  '...KLMK....',
-  '....KMK....',
-  '....KKK....'
+  '....KFFK.....',
+  '..KKFFFFKK...',
+  '..KFFEEFFFK..',
+  '..KFFEEEFFK..',
+  '..KKFFFFFKK..',
+  '...KKFFKKK...',
+  '.....KLK.....',
+  '..KK.KLK.KK..',
+  '.KLLKKLKKDDK.',
+  '..KLLKLKDDK..',
+  '...KKKMKKK...',
+  '.....KMK.....',
+  '.....KKK.....'
 ];
 
 const P_MILKWEED_GROW = [
-  '...KKK...',
-  '..KLMK...',
-  '.KLMMLK..',
-  'KLMKMMLK.',
-  '.KKMMKK..',
-  '..KMMK...',
-  '..KMDK...',
-  '..KKKK...'
+  '....KKK....',
+  '...KLLDK...',
+  '..KKKLKKK..',
+  '.KLLKMKDDK.',
+  'KLLLKMKKDDK',
+  '.KKLKMKDDK.',
+  '.KLLKMKKDK.',
+  '..KKKMKKK..',
+  '....KMK....',
+  '....KKK....'
 ];
 const P_MILKWEED_BLOOM = [
-  '..KKKKKKK..',
-  '.KFfFfFfFK.',
-  'KfFfFfFfFfK',
-  'KFfFfFfFfFK',
-  '.KfFfFfFfK.',
-  '..KKKKKKK..',
-  '...KMMMK...',
-  '..KLMMMK...',
-  '...KMMMK...',
-  '..KLMMMLK..',
-  '...KMMMK...',
-  '...KKKKK...'
+  '....KFFK.....',
+  '...KFFfFK....',
+  '..KFfFFfFK...',
+  '...KfFffK....',
+  '....KKfK.....',
+  '.....KLK.....',
+  '..KK.KLK.....',
+  '.KLLKKMK.KK..',
+  'KLLLKKMKKDDK.',
+  '.KKLKKMKDDDK.',
+  '...KKKMKKKK..',
+  '.....KMK.....',
+  '.....KKK.....'
 ];
 
 const P_BLAZINGSTAR_GROW = [
-  '..K..',
-  '.KLK.',
-  'KLMLK',
-  '.KMK.',
-  'KLMLK',
-  '.KMK.',
-  'KLMLK',
-  '.KMK.',
-  '.KMK.',
-  '.KDK.',
-  '.KDK.',
-  '.KKK.'
+  '...KKK...',
+  '...KLK...',
+  '...KLK...',
+  '..KKLKK..',
+  '.KLKLKDK.',
+  '.KLKMKDK.',
+  'KLKKMKKDK',
+  '.KKKMKKK.',
+  '...KMK...',
+  '...KMK...',
+  '...KKK...'
 ];
 const P_BLAZINGSTAR_BLOOM = [
-  '...K...',
-  '..KFK..',
-  '.KFFFK.',
-  'KFfFfFK',
-  'KFFfFFK',
-  'KfFFFfK',
-  'KFfFfFK',
-  'KFFfFFK',
-  'KfFFFfK',
-  '.KFfFK.',
-  '.KFFFK.',
-  '..KFK..',
-  '..KKK..',
-  '..KMK..',
-  'KLMLK..',
-  '..KMK..',
-  '..KDK..',
-  '..KKK..'
+  '...KFK...',
+  '..KFfFK..',
+  '..KFFfK..',
+  '..KfFFK..',
+  '..KFfFK..',
+  '...KfK...',
+  '...KLK...',
+  '..KKLKK..',
+  '.KLKLKDK.',
+  '.KLKMKDK.',
+  'KLKKMKKDK',
+  '.KKKMKKK.',
+  '...KMK...',
+  '...KKK...'
 ];
 
 const P_TOMATO_GROW = [
-  '...KKKKK...',
-  '..KLLLLLK..',
-  '.KLMMLMMLK.',
-  'KLMMDMMDMLK',
-  'KMMDMMMDMMK',
-  '.KMMDMDMMK.',
-  '..KMMDMMK..',
-  '...KMDMK...',
-  '....KDK....',
-  '....KKK....'
+  '...KKK.KK...',
+  '..KLLKKLLK..',
+  '.KLLLMLLMDK.',
+  'KLSLMMLMMDDK',
+  'KLLMMDMMDMDK',
+  '.KLMMDDMDDK.',
+  '..KKMDDMKK..',
+  '....KMMK....',
+  '....KKKK....'
 ];
 const P_TOMATO_BLOOM = [
-  '...KKKKK...',
-  '..KLLLLLK..',
-  '.KLMMLMMLK.',
-  'KLMFfMFfMLK',
-  'KMMFFMFFMMK',
-  'KMDMMMMMDMK',
-  '.KMFfMMDMK.',
-  '..KFFMDMK..',
-  '...KMDMK...',
-  '...KMDMK...',
-  '....KDK....',
-  '....KKK....'
+  '...KKK.KK...',
+  '..KLLKKLLK..',
+  '.KLLLMLLMDK.',
+  'KLSLMFFMMDDK',
+  'KLLMMFfMDMDK',
+  '.KLMMDDMFFK.',
+  '..KKMDDMffK.',
+  '...KKMKKKK..',
+  '....KMMK....',
+  '....KKKK....'
 ];
 
 const P_BEANS_GROW = [
-  '....K....',
-  '...KwK...',
-  '..KLwK...',
-  '.KLMwK...',
-  '..KKwLK..',
-  '...KwMLK.',
-  '...KwKKK.',
-  '..KLwK...',
-  '.KLMwK...',
-  '..KKwLK..',
-  '...KwMK..',
-  '...KwK...',
-  '...KwK...',
-  '...KKK...'
+  '.....KKK...',
+  '.....KDK...',
+  '..KK.KLK...',
+  '.KLLKKDK...',
+  '.KKKKKDK...',
+  '.....KLKKK.',
+  '.....KDKLLK',
+  '.....KDKKK.',
+  '..KK.KLK...',
+  '.KLLKKDK...',
+  '.KKKKKDK...',
+  '.....KDK...',
+  '....KKEKK..'
 ];
 const P_BEANS_BLOOM = [
-  '....K....',
-  '...KwK...',
-  '..KLwK...',
-  '.KLMwKF..',
-  '..KKwKF..',
-  '..FKwMLK.',
-  '..FKwKKK.',
-  '..fKwK...',
-  '.KLwMKF..',
-  '.KKwKKF..',
-  '..KwMLKf.',
-  '...KwK...',
-  '...KwK...',
-  '...KwK...',
-  '...KKK...'
+  '.....KKK...',
+  '...KKKLKK..',
+  '..KLLKDKLK.',
+  '.KLSLKDKLLK',
+  '.KLLKKLKMLK',
+  '..KKFKDKKLK',
+  '...KfKDKFKK',
+  '...KKKLKfK.',
+  '..KK.KDKKK.',
+  '.KLLKKDK...',
+  '.KKKKKDK...',
+  '.....KDK...',
+  '....KKEKK..'
 ];
 
 /* ---- the forecast sign -------------------------------------
@@ -2047,6 +2044,107 @@ const ICON_RAIN = [
   '.B..B..B...',
   'B..B..B....',
   '...........'
+];
+
+/* ---- the button and menu icons -----------------------------
+   Approved Aug 4 — GROUP B and GROUP C of APPROVED_SPRITES.md,
+   copied in verbatim. The watering can and the seed pouch are
+   drawn in the plain six roles (K/E/D/M/L/S) like everything
+   else in the world, so they change with the time of day along
+   with it. The six little seed icons use F and f, and each one
+   is coloured from its own flower's bloom colours — a tomato
+   seed is tomato red, a coneflower seed is coneflower purple —
+   so a row of the planting list matches what will come up. */
+
+const UI_WATERING_CAN = [
+  '.....KKKKK........',
+  '....KK...KK.......',
+  '...KK.....KK......',
+  '...K.......K......',
+  '..KKKKKKKKKKK.....',
+  '.KLSLLLLLLDDK..KKK',
+  '.KLLLLLLLLDDK.KLDK',
+  '.KLLLLLLLLDDKKDDK.',
+  '.KLLLMMMMDDDDDK...',
+  '.KLLLMMMMDDDDK....',
+  '.KLLLMMMMDDDK.....',
+  '.KLLMMMMDDDDK.....',
+  '..KKKKKKKKKK......'
+];
+
+const UI_SEED_POUCH = [
+  '....KK.KK.....',
+  '....KLKDK.....',
+  '.....KKKK.....',
+  '....KLLDK.....',
+  '...KKLLDKK....',
+  '..KLLLLMDDK...',
+  '.KLSLLMMMDDK..',
+  '.KLLLMMMMDDK..',
+  'KLLLMMMMMDDDK.',
+  'KLLMMMEMMDDDK.',
+  'KLLMMMMMDDDDK.',
+  '.KLLMMMDDDDK..',
+  '..KKLMDDDKK...',
+  '....KKKKK.....'
+];
+
+const SEED_ICON_CONEFLOWER = [
+  '....KK...',
+  '...KFfK..',
+  '..KFFfK..',
+  '..KFfK...',
+  '.KFfK....',
+  '.KfK.....',
+  '..K......'
+];
+
+const SEED_ICON_SUSAN = [
+  '..KK.....',
+  '.KFfK.KK.',
+  '..KK.KFfK',
+  '..KK..KK.',
+  '.KFfK....',
+  '..KK.....'
+];
+
+const SEED_ICON_MILKWEED = [
+  '.......KLK',
+  '.....KLKLK',
+  '....KLLLK.',
+  '...KKLKK..',
+  '..KFFfK...',
+  '.KFFffK...',
+  '..KKKK....'
+];
+
+const SEED_ICON_BLAZINGSTAR = [
+  '..KK...',
+  '.KFfK..',
+  '..KKK..',
+  '..KFfK.',
+  '..KKK..',
+  '.KFfK..',
+  '..KK...'
+];
+
+const SEED_ICON_TOMATO = [
+  '..KKKK..',
+  '.KFFFfK.',
+  'KFFFFffK',
+  'KFFFfffK',
+  '.KFfffK.',
+  '..KKKK..'
+];
+
+const SEED_ICON_BEANS = [
+  '.KKKK......',
+  'KFFFfK.....',
+  'KFfffK.....',
+  '.KKKK.KKKK.',
+  '.....KFFFfK',
+  '.....KFfffK',
+  '......KKKK.'
 ];
 
 /* Stamps one small typed drawing across a wider blank grid a
@@ -3427,6 +3525,14 @@ class PrairieScene extends Phaser.Scene {
       tomato:      [P_TOMATO_GROW, P_TOMATO_BLOOM],
       beans:       [P_BEANS_GROW, P_BEANS_BLOOM]
     };
+    const SEED_ICON_GRIDS = {
+      coneflower:  SEED_ICON_CONEFLOWER,
+      susan:       SEED_ICON_SUSAN,
+      milkweed:    SEED_ICON_MILKWEED,
+      blazingstar: SEED_ICON_BLAZINGSTAR,
+      tomato:      SEED_ICON_TOMATO,
+      beans:       SEED_ICON_BEANS
+    };
     SEEDS.forEach(s => {
       const pl = Object.assign({}, leafPal, {
         F: lit(s.bloom.F), f: lit(s.bloom.f),
@@ -3437,7 +3543,25 @@ class PrairieScene extends Phaser.Scene {
         c => drawPixels(c, clumpRows(grids[0], PW, PH), pl));
       this.makeTexture('plant_' + s.id + '_bloom', PW, PH,
         c => drawPixels(c, clumpRows(grids[1], PW, PH), pl));
+
+      /* and the little seed for this species, for its row in the
+         planting list — same bloom colours as the flower it grows
+         into, so the two read as a matched pair. */
+      const sg = SEED_ICON_GRIDS[s.id];
+      const ssz = gridSize(sg);
+      this.makeTexture('seedicon_' + s.id, ssz.w, ssz.h,
+        c => drawPixels(c, sg, pl));
     });
+
+    /* The watering can and the seed pouch — straight through the
+       same six roles as everything else, so they sit down at dusk
+       with the rest of the world. */
+    const uiPal = { K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L, S: pal.S };
+    [['ui_wateringcan', UI_WATERING_CAN], ['ui_seedpouch', UI_SEED_POUCH]]
+      .forEach(([key, rows]) => {
+        const g = gridSize(rows);
+        this.makeTexture(key, g.w, g.h, c => drawPixels(c, rows, uiPal));
+      });
 
     const wsz = gridSize(WSIGN_ROWS);
     this.makeTexture('weathersign', wsz.w, wsz.h, c => drawPixels(c, WSIGN_ROWS, FENCE_PAL));
@@ -3711,6 +3835,12 @@ class PrairieScene extends Phaser.Scene {
       color: '#fff8e8', align: 'center'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 1).setVisible(false);
 
+    // the picture that sits in the ring above the word, when the
+    // action has one — the watering can, or the seed pouch
+    this.actionIcon = this.add.image(0, 0, 'ui_wateringcan')
+      .setOrigin(0.5).setScale(2).setScrollFactor(0)
+      .setDepth(D + 1).setVisible(false);
+
     this.readout = this.add.text(10, 10, '', {
       fontFamily: 'monospace', fontSize: '13px', color: '#ffffff',
       backgroundColor: 'rgba(0,0,0,0.35)', padding: { x: 6, y: 4 }
@@ -3719,9 +3849,15 @@ class PrairieScene extends Phaser.Scene {
 
   layoutControls() {
     const w = this.scale.width, h = this.scale.height;
-    this.actionHint.setPosition(w * 0.75, h * 0.62);
-    this.actionRing.setPosition(w * 0.75, h * 0.62);
-    this.actionLabel.setPosition(w * 0.75, h * 0.62);
+    this.actionX = w * 0.75;
+    this.actionY = h * 0.62;
+    this.actionHint.setPosition(this.actionX, this.actionY);
+    this.actionRing.setPosition(this.actionX, this.actionY);
+    this.actionLabel.setPosition(this.actionX, this.actionY);
+    this.actionIcon.setPosition(this.actionX, this.actionY - 9);
+    // force the button to re-read itself, so the word and the
+    // picture line themselves up again at the new size
+    this.actionVerbShown = null;
     this.readout.setPosition(10, 10);
     this.areaLabel.setPosition(w * 0.5, 52);
     this.msgText.setPosition(w * 0.5, h - 52);
@@ -4039,12 +4175,39 @@ class PrairieScene extends Phaser.Scene {
     }
 
     let verb = i >= 0 ? this.plotVerb(i) : '';
+    const atBed = !!verb;                 // is this a garden bed, or a tree?
     if (!verb && this.activeTree >= 0) verb = this.treeVerb(this.activeTree);
-    if (this.actionVerbShown === verb) return;
-    this.actionVerbShown = verb;
+
+    /* Which little picture belongs on the button, if any. Watering
+       is watering whether it's a bed or a sapling, so the can shows
+       for both. The seed pouch is only for sowing a BED — putting a
+       pouch on "plant a tree" would be telling a small lie, and a
+       tree goes in as a sapling, not as seed. HARVEST, CHECK,
+       DEDICATE and READ have no approved icon yet and stay as the
+       plain word they've always been. */
+    const iconKey = verb === 'WATER' ? 'ui_wateringcan'
+      : (atBed && (verb === 'PLANT' || verb === 'REPLANT')) ? 'ui_seedpouch'
+      : null;
+
+    const shown = verb + '|' + (iconKey || '');
+    if (this.actionVerbShown === shown) return;
+    this.actionVerbShown = shown;
+
     this.actionLabel.setText(verb).setVisible(!!verb);
     this.actionRing.setVisible(!!verb);
     this.actionHint.setVisible(!verb);
+
+    /* With a picture, the word shrinks and tucks in underneath it.
+       Without one, the word sits in the middle of the ring exactly
+       as it did before. */
+    if (verb && iconKey) {
+      this.actionIcon.setTexture(iconKey)
+        .setPosition(this.actionX, this.actionY - 9).setVisible(true);
+      this.actionLabel.setFontSize(12).setPosition(this.actionX, this.actionY + 22);
+    } else {
+      this.actionIcon.setVisible(false);
+      this.actionLabel.setFontSize(15).setPosition(this.actionX, this.actionY);
+    }
   }
 
   /* The button was pressed while he's at a bed. */
@@ -4512,6 +4675,12 @@ class PrairieScene extends Phaser.Scene {
     objs.push(panel);
 
     const p = this.garden.plots[plotIndex];
+
+    // the seed pouch in the corner of the heading, so this list and
+    // the button that opened it read as the same one action
+    objs.push(this.add.image(px - panelW / 2 + 28, top + 32, 'ui_seedpouch')
+      .setOrigin(0.5).setScale(2).setScrollFactor(0).setDepth(D + 2));
+
     objs.push(this.add.text(px, top + 26,
       isReplant ? 'Replant this bed?' : 'What shall we plant?',
       { fontFamily: font, fontSize: '20px', color: '#f6ecd6' })
@@ -4533,6 +4702,13 @@ class PrairieScene extends Phaser.Scene {
         this.chooseSeed(s.id);
       });
       objs.push(btn);
+
+      // its seed, at the left-hand end of the row, in the same
+      // colours the flower will be when it comes up
+      objs.push(this.add.image(px - (panelW - 26) / 2 + 22, ry,
+        'seedicon_' + s.id)
+        .setOrigin(0.5).setScale(2).setScrollFactor(0).setDepth(D + 3));
+
       objs.push(this.add.text(px, ry, s.name,
         { fontFamily: font, fontSize: '17px', color: '#f6ecd6' })
         .setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
