@@ -215,6 +215,26 @@ const HERO_ROLE_MAP = {
   N: 'D', n: 'E'
 };
 
+/* REVERSED Aug 6, same reasoning as Henri and the rabbits: he was
+   blending into the lawn because his skin/cap/shorts were all
+   literally the same ambient "light" hex, and his hair/glasses/
+   shirt/sandals all the same "dark" hex. Given real colors of his
+   own instead — a parks-manager palette (olive cap, khaki shirt,
+   brown shorts), medium-tan skin, dark brown hair/beard — nudged
+   toward the ambient light the same quarter-step as everything
+   else. Easy to retune: these are the only lines that need to
+   change. HERO_ROLE_MAP above still decides which letter maps to
+   which named color; only where each name's hex comes from changed. */
+const HERO_COLORS = {
+  S: '#d9a873', s: '#b8845a',
+  H: '#3b2a1e', h: '#251a12',
+  P: '#6b3fa0', p: '#4a2b70',   // purple cap, requested Aug 6
+  G: '#2a2a2a',
+  T: '#262626', t: '#141414',   // black shirt, requested Aug 6
+  C: '#7a5a3a', c: '#5c4128',
+  N: '#6b4a30', n: '#4a3220'
+};
+
 const HERO_DOWN = [
   '................................',
   '................................',
@@ -370,14 +390,26 @@ function heroFrames() {
    there's no separate drawing to keep in sync) — each with two
    walking frames (a little hop) and one sitting frame.
 
-   Resolved Aug 2: like everything else, he's colored from the
-   active six-role palette rather than his own fixed white/cream
-   coat. His "coat" borrows the L (light) role, his belly-shadow
-   borrows M (mid), and his ears/eye-patch/nose borrow D (dark) —
-   the same light-to-dark relationship he always had, just riding
-   on whatever the current time-of-day palette is instead of a
-   fixed white. ============================================================ */
+   Resolved Aug 2, REVERSED Aug 6: he was briefly colored straight
+   from the active six-role palette, the same as grass and trees —
+   Andra's playtest found this meant his coat and the rabbits'
+   fur were landing on the same greens as the lawn, so both were
+   hard to track in motion. He's back to his own fixed white coat
+   / black markings (HENRI_COLORS below), nudged only a quarter of
+   the way toward whatever light is active — the same trick the
+   flowers use to stay their own true color while still going
+   quiet at dusk with everything else. Outline (K) still comes
+   from the shared palette, same as every other sprite, so he
+   still belongs to the same "storybook" as the rest of the world.
+
+   Also enlarged Aug 6 (CRITTER_SCALE): he and the rabbits were
+   both being drawn at their native, unscaled pixel size while
+   everything else in the game (him, the houses, the trees) is
+   baked in at 3x. Same trick as the hero sprite — the scale is
+   baked into the texture at build time, not applied afterward. */
 const HENRI_W = 26, HENRI_H = 20;
+const CRITTER_SCALE = 2;
+const HENRI_COLORS = { L: '#f4ecd8', M: '#d8c8a6', D: '#241f1a', E: '#171310' };
 
 /* Henri, redrawn Aug 3 as hand-pixel letter grids — the same
    treatment as every other living thing in the game. He'd been the
@@ -531,11 +563,118 @@ const HENRI_GRIDS = {
   up: HENRI_UP, upSit: HENRI_UP_SIT
 };
 
-function drawHenri(ctx, dir, sit, bounce, pal) {
+function drawHenri(ctx, dir, sit, bounce, pal, scale) {
+  scale = scale || 1;
   const rows = HENRI_GRIDS[dir + (sit ? 'Sit' : '')];
-  const hp = { K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L };
-  // the trot hop: the whole drawing lifts one pixel
-  drawPixels(ctx, rows, hp, 0, bounce ? -1 : 0);
+  // his own true colors, only nudged a quarter of the way toward
+  // the ambient light — see the note above
+  const lit = hex => blendHex(hex, pal.M, 0.25);
+  const hp = {
+    K: pal.K,
+    E: lit(HENRI_COLORS.E),
+    D: lit(HENRI_COLORS.D),
+    M: lit(HENRI_COLORS.M),
+    L: lit(HENRI_COLORS.L)
+  };
+  // the trot hop: the whole drawing lifts, scaled the same as everything else
+  drawPixels(ctx, rows, hp, 0, bounce ? -scale : 0, scale);
+}
+
+/* ============================================================
+   RABBITS — Stage 5
+   ------------------------------------------------------------
+   Hand-pixel letter grids, same K/E/D/M/L/S roles as everything
+   else, plus one extra letter (f) just for the pink of the nose —
+   copied verbatim from STAGE_5_NEW_SPRITES.md. Four static poses
+   (a mid-hop for each of three facings, plus one sitting-alert
+   idle) rather than a walk-cycle sheet — simple hops and a little
+   sine bounce in code read as "alive" without needing more frames.
+   ============================================================ */
+const RABBIT_HOP_LEFT = [
+  '.......KKK.KK.....',
+  '......KLLKKLDK....',
+  '.....KLfLKKLDK....',
+  '..KKKKLfLLKLLK....',
+  '.KLLLLLLLLKKKKK...',
+  'KLSLLLLLLLMMMLK...',
+  'KLELLLLLMMMMDMLKK.',
+  '.KLLLLMMMMDDDMKLLK',
+  '..KLLKKKMDDDKKKLLK',
+  '...KLK..KDDK..KKK.',
+  '....K....KK.......'
+];
+
+const RABBIT_IDLE_LEFT = [
+  '....KK..KK....',
+  '...KLLKKLDK...',
+  '...KLfKKLDK...',
+  '...KLfKKLDK...',
+  '...KLLKKLLK...',
+  '..KKLLLLLLKK..',
+  '.KLLLLLLLLLLK.',
+  '.KLELLLLLLMLK.',
+  '.KLLLLLLLMMLK.',
+  '.KLLLLLMMMMLK.',
+  '.KLLLLMMMMMLLK',
+  'KLLLLMMDDMMLLK',
+  'KLLLKMDDDMKLLK',
+  '.KKKLDDDDLKKK.',
+  '...KKKKKKKK...'
+];
+
+const RABBIT_HOP_DOWN = [
+  '..KK...KK....',
+  '.KLLK.KLDK...',
+  '.KLfK.KfDK...',
+  '.KLLKKKLLK...',
+  '.KLLLLLLLLK..',
+  'KLSLLLLLLLDK.',
+  'KLELLLLLELDK.',
+  'KLLLLELLLLDK.',
+  'KLLLLLLLMMDK.',
+  '.KLLLMMMMDDK.',
+  '.KKLLKKKKDDK.',
+  '..KKKK..KKKK.'
+];
+
+const RABBIT_HOP_UP = [
+  '..KK...KK....',
+  '.KLDK.KDDK...',
+  '.KLDK.KDDK...',
+  '.KLLKKKLDK...',
+  '.KLLLLLLLDK..',
+  'KLSLLLLLLMDK.',
+  'KLLLLLMMMMDK.',
+  'KLLLMMMMMDDK.',
+  '.KLLMMMDDDK..',
+  '.KLLKLLKDDK..',
+  '..KKKLLKKK...',
+  '....KKKK.....'
+];
+
+function drawRabbit(ctx, rows, pal, scale) {
+  drawPixels(ctx, rows, pal, 0, 0, scale || 1);
+}
+
+/* His own true colors too — warm brown/tan fur rather than the
+   ambient palette, same reasoning as Henri above (added Aug 6,
+   after the first cut had them both blending into the grass). */
+const RABBIT_COLORS = {
+  L: '#e6cd9e', M: '#b98f5c', D: '#5a3f24', E: '#3a2814', S: '#fdf6e8'
+};
+
+/* Aug 6 — how often a rabbit shows up. Andra wants it frequent
+   while she's testing, but "once in a while" once it's actually
+   Mike's game to play — often enough is what makes it feel
+   special rather than routine. Rather than two versions of the
+   cooldown logic to keep in sync, there's one switch here.
+
+   >>> SET THIS TO false BEFORE THE AUGUST 12 REVEAL. <<< */
+const CHASE_TESTING_MODE = true;
+function pickChaseCooldown() {
+  return CHASE_TESTING_MODE
+    ? 25000 + Math.random() * 25000          // testing: roughly every 25-50 seconds
+    : 600000 + Math.random() * 600000;       // shipped: roughly every 10-20 minutes
 }
 
 /* ============================================================
@@ -2556,6 +2695,22 @@ const ART = 16;
 const SCALE = 3;
 const T = ART * SCALE;          // 48 — one map square
 
+// Rabbit-chase minigame — paused after Aug 7. The chase itself works
+// (Henri, the rabbits, the timer, the win/lose flow all run fine), but
+// it lives in the open backyard sharing space with the garden beds and
+// trees, and that's produced a string of edge-of-map bugs (rabbits
+// spawning too close to the fence, one rabbit slipping out of bounds
+// while Henri's busy chasing another). The fix is to give it its own
+// small fenced paddock area instead of the shared yard — see
+// RABBIT_CHASE_PADDOCK_KICKOFF.md for the full plan. That's a
+// post-birthday project, not worth the time before Aug 12.
+//
+// Flipping this to false leaves all the chase code in place (nothing
+// deleted) but stops the cue rabbit from ever appearing, so the whole
+// minigame is quietly off for now. Flip it back to true once the
+// paddock rework lands, or to spot-check the old behavior.
+const RABBIT_CHASE_ENABLED = false;
+
 const SNAP_STEP = Math.PI / 4;  // movement snaps to 8 compass directions
 
 /* How big a solid, un-walk-through-able box each thing gets, in
@@ -2729,48 +2884,62 @@ function treeById(id) { return TREES.find(t => t.id === id) || null; }
 const TREE_STAGE_NAMES = ['a sapling', 'young', 'fully grown'];
 
 /* ---- where a tree can go -----------------------------------
-   Prepared planting spots, counted in map squares: three in his
-   own backyard and six out on the lawn at Harmon Park. Each one
-   is a small ring of turned earth, and each one is solid, so he
-   walks up to it exactly the way he walks up to a garden bed
-   and can never end up standing inside his own tree.
+   Anywhere on open grass. He walks to the patch he likes, taps
+   the little "Plant a Tree" button in the corner, picks a
+   species, and it goes in one short step in front of him.
 
-   Free planting anywhere on the grass is the obvious next step
-   after the reveal; these fixed spots are the version that
-   cannot possibly wall him into a corner. */
-const TREE_SPOTS = {
-  /* The backyard is the strip ABOVE the house, not below it — the
-     house itself is 13 squares wide and stands on row 21, so the
-     middle of the lower yard is roof. These three sit in the two
-     clear side strips instead: one up by the top fence, two down
-     level with the far corners of the patio. */
-  home: [
-    { col: 6.5, row: 4.5 },
-    { col: 7, row: 17 },
-    { col: 29, row: 17 }
-  ],
-  /* Three down the west lawn and three down the east, leaving the
-     middle of the park to the big oak. Anything planted under its
-     canopy would simply be hidden behind it. */
-  park: [
-    { col: 12, row: 10.5 },
-    { col: 11, row: 15 },
-    { col: 12, row: 19.5 },
-    { col: 28, row: 17 },
-    { col: 30.5, row: 20.5 },
-    { col: 26, row: 22.5 }
-  ]
-};
-/* How solid a planted spot is, in screen pixels. Sized to the
+   There are no prepared spots any more. What used to be nine
+   fixed rings of earth is now a rule instead of a list: the
+   ground has to be plain grass, nothing solid can already be
+   standing there, it has to be a canopy's width clear of his
+   other trees, and it can't sit on top of a way out or a sign.
+   The checks live in canPlantAt() down in the game itself,
+   because that's where it can see the map he's standing on. */
+
+/* How solid a planted tree is, in screen pixels. Sized to the
    trunk, not the canopy — so he can tuck in under the leaves
    exactly like he can with every other tree in the game. */
 const TREE_BLOCK = [34, 16];
 
-function treeSpotKey(areaKey, i) { return areaKey + ':' + i; }
+/* The widest a grown tree ever gets, in screen pixels (the
+   sycamore, 28 art pixels across at SCALE 3). Used as the
+   minimum gap between two of his trees, so a grove reads as a
+   grove and never as two trunks in the same hole. */
+const TREE_CANOPY = 84;
+
+/* How far in front of him a new tree lands. One map square:
+   far enough that its trunk box never spawns on top of his
+   feet and shoves him, close enough that it lands where he
+   was looking. */
+const TREE_REACH = T;
+
+/* Ground he is allowed to plant into. The backyard is laid on
+   'grass' and the park on 'lawn' — both are just open turf as
+   far as a tree is concerned. Paths, driveways, dirt beds and
+   hedges are not. */
+const PLANTABLE_GROUND = { grass: true, lawn: true };
+
+/* The two areas that get the Plant button at all. The street is
+   deliberately left out — it isn't his to plant. */
+const PLANTABLE_AREAS = { home: true, park: true };
+
+/* Every tree needs a name of its own that nothing else will ever
+   reuse, so that watering one, dedicating one and reading one all
+   land on the same tree even after he's planted a dozen. Time plus
+   a counter is plenty for one person's game. */
+let TREE_ID_SEQ = 0;
+function nextTreeId() {
+  TREE_ID_SEQ++;
+  return 't' + Date.now().toString(36) + '-' + TREE_ID_SEQ.toString(36);
+}
 
 /* ---- a brand-new tree, the moment it goes in the ground ---- */
-function newTree(speciesId, dayKeyStr) {
+function newTree(speciesId, dayKeyStr, areaKey, x, y) {
   return {
+    id: nextTreeId(), // this tree, and only this tree, forever
+    ar: areaKey,     // which area it stands in
+    x: Math.round(x),// and exactly where, in screen pixels
+    y: Math.round(y),// (the middle of its base, like every prop)
     sp: speciesId,   // which species
     st: 0,           // 0 sapling, 1 young, 2 mature
     pr: 0,           // days of growth banked toward the next size
@@ -2817,15 +2986,16 @@ const PLOT_TILES_W = 2;
 /* ---- a brand-new, empty garden ----------------------------- */
 function newGarden() {
   return {
-    v: 2,
+    v: 3,
     day: null,
     plots: GARDEN_PLOTS.map(() => ({
       seed: null, stage: 0, wilted: false, watered: false, care: 0, picked: 0
     })),
-    // Stage 4. Kept as a lookup rather than a list, keyed by
-    // "which area : which spot", so adding more planting spots
-    // later can never shuffle the trees he already has.
-    trees: {}
+    // Stage 4, reworked for free placement. A plain list now, one
+    // entry per tree he has actually planted, each one carrying its
+    // own area and position. Nothing about the map decides what's
+    // in here any more — only what he did.
+    trees: []
   };
 }
 
@@ -2837,7 +3007,7 @@ function beginDay(g, key) {
   const wet = weatherFor(key) === 'rainy';
   g.plots.forEach(p => { p.watered = wet; });
   // Rain waters his saplings too, of course.
-  Object.keys(g.trees || {}).forEach(k => { g.trees[k].wat = wet; });
+  (g.trees || []).forEach(t => { t.wat = wet; });
 }
 
 /* ---- what one finished day does to one bed -----------------
@@ -2886,7 +3056,7 @@ function catchUp(g, todayKey) {
   while (g.day !== todayKey && passed < 400) {
     const w = weatherFor(g.day);
     g.plots.forEach(p => endDay(p, w));
-    Object.keys(g.trees || {}).forEach(k => endTreeDay(g.trees[k], w));
+    (g.trees || []).forEach(t => endTreeDay(t, w));
     beginDay(g, nextDayKey(g.day));
     passed++;
   }
@@ -2925,11 +3095,14 @@ function loadGarden() {
     const raw = window.localStorage.getItem(SAVE_KEY);
     if (!raw) return newGarden();
     const data = JSON.parse(raw);
-    // Stage 4 bumped the save to version 2 by adding trees. A
-    // version 1 save (his garden as it stands today) is read
-    // exactly as before and simply arrives with no trees yet —
-    // nothing he has already grown is lost.
-    if (!data || (data.v !== 1 && data.v !== 2) || !Array.isArray(data.plots)) return newGarden();
+    // Stage 4 bumped the save to version 2 by adding trees;
+    // free placement bumps it again to version 3 by changing the
+    // shape trees are written in. Every version is still read for
+    // his GARDEN — the beds have never changed — so nothing he has
+    // grown is ever lost. Only the trees are version-fussy, and
+    // that's handled below.
+    if (!data || (data.v !== 1 && data.v !== 2 && data.v !== 3) ||
+        !Array.isArray(data.plots)) return newGarden();
     const g = newGarden();
     g.day = typeof data.day === 'string' ? data.day : null;
     for (let i = 0; i < g.plots.length; i++) {
@@ -2944,12 +3117,22 @@ function loadGarden() {
         picked: Math.max(0, s.picked | 0)
       };
     }
-    const t = data.trees;
-    if (t && typeof t === 'object') {
-      Object.keys(t).forEach(k => {
-        const s = t[k];
+    /* Trees. Only the new free-placement shape (a LIST) is read.
+       An old version-2 save holds the nine-fixed-spots shape (a
+       lookup), which has no positions in it at all and can't be
+       converted into anything sensible — so it's simply dropped
+       and he starts his trees fresh. Confirmed with Andra: there
+       are no planted trees that need to survive this. */
+    if (Array.isArray(data.trees)) {
+      data.trees.forEach(s => {
         if (!s || !treeById(s.sp)) return;
-        g.trees[k] = {
+        if (!AREAS[s.ar]) return;                      // an area that no longer exists
+        if (!isFinite(s.x) || !isFinite(s.y)) return;  // a position that isn't one
+        g.trees.push({
+          id: (typeof s.id === 'string' && s.id) ? s.id : nextTreeId(),
+          ar: s.ar,
+          x: Math.round(s.x),
+          y: Math.round(s.y),
           sp: s.sp,
           st: Math.max(0, Math.min(2, s.st | 0)),
           // clamped to one LESS than a full stage: a legitimate save
@@ -2961,7 +3144,7 @@ function loadGarden() {
           th: !!s.th,
           ded: s.ded ? cleanDedication(s.ded) : null,
           pd: typeof s.pd === 'string' ? s.pd : null
-        };
+        });
       });
     }
     return g;
@@ -2996,7 +3179,6 @@ class AreaData {
     this.solids = [];
     this.exits = [];
     this.signs = [];
-    this.treeSpots = [];
   }
   set(x, y, t) {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
@@ -3056,17 +3238,6 @@ class AreaData {
       x: col * T, y: row * T, w: w * T, h: h * T,
       to, sx: spawnCol * T, sy: spawnRow * T
     });
-  }
-
-  /* A prepared tree-planting spot: a ring of turned earth, given
-     as the middle of its base in map squares. It's solid — sized
-     to a trunk, not a canopy — so he walks up to it the same way
-     he walks up to a garden bed, and can never end up standing
-     inside his own tree. */
-  treeSpot(cx, baseRow) {
-    this.treeSpots.push({ i: this.treeSpots.length, x: cx * T, y: baseRow * T });
-    this.solid(cx * T - TREE_BLOCK[0] / 2, baseRow * T - TREE_BLOCK[1],
-               TREE_BLOCK[0], TREE_BLOCK[1]);
   }
 
   /* A sign whose words appear at the bottom of the screen when he
@@ -3138,9 +3309,10 @@ const AREAS = {
       a.prop('weathersign', 9.2, 7.6);
       a.signs.push({ x: 9.2 * T, y: 7.6 * T, weather: true });
 
-      // STAGE 4 — three planting spots on the open back lawn, well
-      // clear of the beds, the patio and the driveway
-      TREE_SPOTS.home.forEach(s => a.treeSpot(s.col, s.row));
+      // STAGE 4, reworked — there are no prepared planting spots
+      // here any more. The whole back lawn (and the front, if he
+      // fancies it) is open grass, and a tree goes in wherever he
+      // taps Plant a Tree.
 
       // out front
       a.prop('bush', 11.6, 21.9);
@@ -3262,10 +3434,9 @@ const AREAS = {
       a.prop('bush', 26, 10.5);
       a.prop('bush', 18, 10.5);
 
-      // STAGE 4 — six planting spots spread across the open lawn,
-      // clear of the oak's shade, the shed, the benches and the
-      // loop path. This is the town's job: filling the park in.
-      TREE_SPOTS.park.forEach(s => a.treeSpot(s.col, s.row));
+      // STAGE 4, reworked — no prepared spots. The whole lawn, on
+      // both sides of the loop path, is his to fill in. This is the
+      // town's job, and now it's genuinely his call where it goes.
 
       // woods around the edge
       const woods = [];
@@ -3324,6 +3495,15 @@ class PrairieScene extends Phaser.Scene {
     this.treeViews = [];
     this.signIcons = [];
     this.dedicationBox = null;
+
+    // Stage 5 — the rabbit chase. Not tied to the save file at all;
+    // it's just a live bit of fun that resets whenever the app
+    // reopens, the same as the joystick or the message box.
+    this.chaseActive = false;
+    this.henriChaseReady = false;
+    this.henriChaseCooldown = pickChaseCooldown();
+    this.chaseRabbits = [];
+    this.rabbitsHerded = 0;
 
     this.buildArt();
     this.buildPlayer();
@@ -3412,10 +3592,21 @@ class PrairieScene extends Phaser.Scene {
     const pal = this.palette;
 
     /* ---- him ---- */
-    // Turn his 14-letter role map into an actual palette by looking
-    // each role up in the active six-color set.
+    // Fixed identity colors, same fix as Henri and the rabbits —
+    // he was fully inheriting the ambient six roles (skin, cap, and
+    // shorts were literally all the same "light" hex; hair, glasses,
+    // shirt, and sandals all the same "dark" one), which is why he
+    // read as flat and blended into the lawn. K stays shared with
+    // the rest of the world for the outline; the lens keeps a real
+    // ambient glint on purpose. Everything else is his own true
+    // color, nudged a quarter toward the light like everyone else.
+    const heroLit = hex => blendHex(hex, pal.M, 0.25);
     const heroPal = {};
-    Object.keys(HERO_ROLE_MAP).forEach(k => { heroPal[k] = pal[HERO_ROLE_MAP[k]]; });
+    Object.keys(HERO_ROLE_MAP).forEach(k => {
+      if (k === 'K') heroPal.K = pal.K;
+      else if (k === 'g') heroPal.g = pal.S;
+      else heroPal[k] = heroLit(HERO_COLORS[k]);
+    });
 
     const frames = heroFrames();
     const hw = 32 * SCALE;
@@ -3438,6 +3629,7 @@ class PrairieScene extends Phaser.Scene {
     });
 
     this.buildHenriArt(pal);
+    this.buildRabbitArt(pal);
 
     /* ---- the ground ---- */
     // Fences, signposts, and the hedge all use letter grids too, so
@@ -3623,7 +3815,9 @@ class PrairieScene extends Phaser.Scene {
      sheet — outlining the whole sheet at once would smear a line
      across the gap between frames. */
   buildHenriArt(pal) {
-    const HW = HENRI_W, HH = HENRI_H;
+    // Baked in at CRITTER_SCALE, same as the hero sprite — see the
+    // note above HENRI_W.
+    const HW = HENRI_W * CRITTER_SCALE, HH = HENRI_H * CRITTER_SCALE;
     const specs = [
       ['down0', 'down', false, false], ['down1', 'down', false, true], ['downSit', 'down', true, false],
       ['up0', 'up', false, false], ['up1', 'up', false, true], ['upSit', 'up', true, false],
@@ -3637,7 +3831,7 @@ class PrairieScene extends Phaser.Scene {
       // running one would fatten his line to two pixels.
       const frame = document.createElement('canvas');
       frame.width = HW; frame.height = HH;
-      drawHenri(frame.getContext('2d'), s[1], s[2], s[3], pal);
+      drawHenri(frame.getContext('2d'), s[1], s[2], s[3], pal, CRITTER_SCALE);
       ctx.drawImage(frame, i * HW, 0);
     });
     tex.refresh();
@@ -3652,6 +3846,39 @@ class PrairieScene extends Phaser.Scene {
         frameRate: 6,
         repeat: -1
       });
+    });
+  }
+
+  /* Stage 5 — the rabbits. Four static poses (no walk-cycle
+     needed): a mid-hop for each of three facings, plus one
+     sitting-alert idle used both as the "a rabbit's about"
+     signal and for a rabbit that's momentarily standing still
+     mid-chase. Colored from the same six roles as everything
+     else, plus a fixed soft-pink nose nudged toward the current
+     light the same way the flowers are. */
+  buildRabbitArt(pal) {
+    const lit = hex => blendHex(hex, pal.M, 0.25);
+    const rp = {
+      K: pal.K,
+      E: lit(RABBIT_COLORS.E),
+      D: lit(RABBIT_COLORS.D),
+      M: lit(RABBIT_COLORS.M),
+      L: lit(RABBIT_COLORS.L),
+      S: lit(RABBIT_COLORS.S),
+      f: lit('#e2a08f')
+    };
+    [
+      ['rabbit_hop_left', RABBIT_HOP_LEFT],
+      ['rabbit_idle_left', RABBIT_IDLE_LEFT],
+      ['rabbit_hop_down', RABBIT_HOP_DOWN],
+      ['rabbit_hop_up', RABBIT_HOP_UP]
+    ].forEach(([key, rows]) => {
+      const sz = gridSize(rows);
+      // The grids carry their own K outline, same as Henri. Baked
+      // in at CRITTER_SCALE too, so he isn't the one tiny thing in
+      // a world where everything else is drawn 3x up.
+      this.makeTexture(key, sz.w * CRITTER_SCALE, sz.h * CRITTER_SCALE,
+        c => drawRabbit(c, rows, rp, CRITTER_SCALE));
     });
   }
 
@@ -3695,6 +3922,10 @@ class PrairieScene extends Phaser.Scene {
       v.hole.destroy(); v.tree.destroy(); v.plaque.destroy();
     });
     this.treeViews = [];
+    /* Note: the solid box around each of his trunks lives in the
+       same group as the fences and the houses, and that whole
+       group is thrown away and rebuilt a few lines below — so
+       there's nothing separate to tidy up here. */
     if (this.treeGlow) { this.treeGlow.destroy(); this.treeGlow = null; }
     this.activePlot = -1;
     this.activeTree = -1;
@@ -3724,7 +3955,18 @@ class PrairieScene extends Phaser.Scene {
     });
 
     if (key === 'home') this.buildGardenViews(a);
-    if (a.treeSpots.length) this.buildTreeViews(a, key);
+
+    /* His trees. Nothing about them is baked into the map any
+       more, so they're put up here from the save file instead —
+       every tree whose area is this one. areaKey has to be set
+       before we do it, because planting reads it. */
+    this.areaKey = key;
+    this.area = a;
+    this.buildTreeGlow();
+    this.garden.trees
+      .filter(t => t.ar === key)
+      .forEach(t => this.addTreeView(t));
+    this.refreshTrees();
 
     const W = a.w * T, H = a.h * T;
     this.physics.world.setBounds(0, 0, W, H);
@@ -3743,9 +3985,11 @@ class PrairieScene extends Phaser.Scene {
       this.henriFacing = 'down';
     }
 
-    this.areaKey = key;
-    this.area = a;
     this.exitCooldown = 350;
+
+    // the Plant a Tree button belongs to his own yard and the
+    // park, and nowhere else
+    this.updatePlantButton();
 
     this.showAreaLabel(def.label);
     this.hideMessage();
@@ -3783,12 +4027,19 @@ class PrairieScene extends Phaser.Scene {
     // Henri — no physics body of his own. He simply retraces the
     // path his human just walked, which is what keeps him out of
     // fences and trees without needing his own collision checks.
-    this.henriShadow = this.add.ellipse(0, 0, 26, 9, 0x1d2b16, 0.22);
+    this.henriShadow = this.add.ellipse(0, 0, 26 * CRITTER_SCALE, 9 * CRITTER_SCALE, 0x1d2b16, 0.22);
     this.henri = this.add.sprite(0, 0, 'henri', 'downSit');
     this.henri.setOrigin(0.5, 1);
     this.henriTrail = [];
     this.henriState = 'sit';
     this.henriFacing = 'down';
+
+    // Stage 5 — the little sitting rabbit that signals "one's about,
+    // go tap Henri". Positioned wherever chaseZone() says whenever
+    // it's shown; a plain image, not a world prop, so it survives
+    // walking between areas without being torn down and rebuilt.
+    this.henriCue = this.add.image(0, 0, 'rabbit_idle_left')
+      .setOrigin(0.5, 1).setVisible(false);
   }
 
   /* ---------------------------------------------------------
@@ -3845,6 +4096,34 @@ class PrairieScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '13px', color: '#ffffff',
       backgroundColor: 'rgba(0,0,0,0.35)', padding: { x: 6, y: 4 }
     }).setScrollFactor(0).setDepth(D + 2);
+
+    /* ---- the Plant a Tree button ----
+       Deliberately its own small, quiet tap target up in the
+       top-right corner, well away from both the joystick side and
+       the big action button. It has to be separate: the big button
+       is context-sensitive, and making it say PLANT every time he
+       crosses a patch of grass would fill the game with noise. This
+       way, walking around on grass stays exactly as quiet as it is.
+       Plain words for now — a proper hand-drawn icon is a polish
+       job for later, not something to hold the reveal up for. */
+    this.plantBtn = this.add.rectangle(0, 0, 132, 44, 0x2b1d11, 0.72)
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(D).setVisible(false);
+    this.plantBtn.setStrokeStyle(3, 0xcb9f63, 0.9);
+    this.plantBtnLabel = this.add.text(0, 0, 'Plant a Tree', {
+      fontFamily: '-apple-system, sans-serif', fontSize: '15px',
+      color: '#f6ecd6', align: 'center'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 1).setVisible(false);
+
+    // Stage 5 — the little banner that shows while the rabbit
+    // chase is on: rabbits left, and the clock. Same look as the
+    // sign-reading box, just parked up near the top of the screen.
+    this.chaseBox = this.add.rectangle(0, 0, 10, 10, 0x2b1d11, 0.88)
+      .setScrollFactor(0).setDepth(D + 4).setVisible(false);
+    this.chaseBox.setStrokeStyle(3, 0xcb9f63, 0.95);
+    this.chaseText = this.add.text(0, 0, '', {
+      fontFamily: '-apple-system, sans-serif', fontSize: '15px',
+      color: '#f6ecd6', align: 'center'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 5).setVisible(false);
   }
 
   layoutControls() {
@@ -3859,9 +4138,32 @@ class PrairieScene extends Phaser.Scene {
     // picture line themselves up again at the new size
     this.actionVerbShown = null;
     this.readout.setPosition(10, 10);
+
+    /* The Plant button, tucked into the top-right corner. Its
+       bounds are remembered as plain numbers so the tap test can
+       use them directly — see onDown. */
+    const pw = 132, ph = 44, pad = 10;
+    this.plantRect = { x: w - pad - pw, y: pad, w: pw, h: ph };
+    this.plantBtn.setPosition(w - pad, pad);
+    this.plantBtnLabel.setPosition(w - pad - pw / 2, pad + ph / 2);
+
     this.areaLabel.setPosition(w * 0.5, 52);
     this.msgText.setPosition(w * 0.5, h - 52);
     this.msgBox.setPosition(w * 0.5, h - 52);
+    this.chaseText.setPosition(w * 0.5, 94);
+    this.chaseBox.setPosition(w * 0.5, 94);
+  }
+
+  /* Show the Plant button only where planting means something:
+     his own place and the park. Never out on the street — that
+     isn't his to plant, and it would only be a button that always
+     says no. Also hidden while Henri's off after rabbits, when
+     the whole screen belongs to the chase. */
+  updatePlantButton() {
+    const on = !!PLANTABLE_AREAS[this.areaKey] && !this.chaseActive;
+    if (this.plantBtn) this.plantBtn.setVisible(on);
+    if (this.plantBtnLabel) this.plantBtnLabel.setVisible(on);
+    this.plantBtnOn = on;
   }
 
   showAreaLabel(text) {
@@ -3897,6 +4199,19 @@ class PrairieScene extends Phaser.Scene {
      --------------------------------------------------------- */
   onDown(p) {
     if (this.menuOpen) return;
+
+    /* The Plant button gets first refusal on the tap. It has to be
+       asked BEFORE the left-half / right-half split below, or the
+       action button — which owns the whole right-hand side —
+       would swallow every tap aimed at it. */
+    if (this.plantBtnOn && this.plantRect) {
+      const r = this.plantRect;
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        this.pressPlantButton(p.x, p.y);
+        return;
+      }
+    }
+
     if (p.x >= this.scale.width * 0.5) { this.pressAction(p.x, p.y); return; }
     if (this.stickPointerId === null) {
       this.stickPointerId = p.id;
@@ -3935,8 +4250,18 @@ class PrairieScene extends Phaser.Scene {
     this.stickKnob.setVisible(false);
   }
 
-  pressAction(x, y) {
-    this.actionCount++;
+  /* He tapped Plant a Tree. Same little ripple every other tap
+     gets, then straight to the species list. No "are you sure?" —
+     picking a species from that list is already the deliberate
+     step, and the spot is judged the moment he picks. */
+  pressPlantButton(x, y) {
+    if (this.chaseActive) return;
+    this.tapRipple(x, y);
+    this.openTreeMenu();
+  }
+
+  /* The little expanding ring that answers a tap. */
+  tapRipple(x, y) {
     const ring = this.add.circle(x, y, 18, 0xffffff, 0)
       .setScrollFactor(0).setDepth(10005);
     ring.setStrokeStyle(3, 0xffffff, 0.9);
@@ -3947,12 +4272,23 @@ class PrairieScene extends Phaser.Scene {
       duration: 320, ease: 'Quad.Out',
       onComplete: () => ring.destroy()
     });
+  }
+
+  pressAction(x, y) {
+    // Stage 5 — the right half of the screen is only the action
+    // button when he's not already mid-chase; during it, the whole
+    // screen is just movement for Henri.
+    if (this.chaseActive) return;
+    this.actionCount++;
+    this.tapRipple(x, y);
 
     // Stage 3: if he's standing at a bed, the button does the
     // gardening rather than nothing at all.
     if (this.activePlot >= 0) { this.doPlotAction(this.activePlot); return; }
     // Stage 4: and if he's at a planting spot, it does the trees.
-    if (this.activeTree >= 0) this.doTreeAction(this.activeTree);
+    if (this.activeTree >= 0) { this.doTreeAction(this.activeTree); return; }
+    // Stage 5: and if Henri's right there with a rabbit about, off they go.
+    if (this.activeHenri) this.startRabbitChase();
   }
 
   resolveDirection(vx, vy) {
@@ -3971,6 +4307,13 @@ class PrairieScene extends Phaser.Scene {
       return;
     }
     if (this.menuOpen) { this.player.body.setVelocity(0, 0); return; }
+
+    // Stage 5 — while the rabbit chase is on, it runs the whole
+    // show: him standing still, Henri under direct control instead
+    // of following, nothing else in the world checked or ticked.
+    // Self-contained on purpose.
+    if (this.chaseActive) { this.updateChase(delta); return; }
+
     if (this.exitCooldown > 0) this.exitCooldown -= delta;
 
     let vx = this.stickVector.x;
@@ -4010,12 +4353,32 @@ class PrairieScene extends Phaser.Scene {
     this.dayCheck = (this.dayCheck || 0) - delta;
     if (this.dayCheck <= 0) { this.dayCheck = 4000; this.checkNewDay(); }
 
-    // A garden bed always wins over a planting spot, but the two
-    // are far enough apart in both areas that it never comes up.
-    this.activePlot = this.nearestPlot();
-    this.activeTree = (this.activePlot >= 0) ? -1 : this.nearestTreeSpot();
+    /* Which one thing is he standing at — a garden bed, or one of
+       his trees? A bed used to win automatically, because the nine
+       fixed planting spots were laid out well clear of the garden
+       and the two could never both be in reach. Now that he can
+       plant wherever he likes, he can absolutely stand a tree
+       beside a bed — so it's decided by which one he's actually
+       closer to, and a tree tucked in near the garden is still his
+       to water. */
+    const nearP = this.nearestPlot();
+    const nearT = this.nearestTreeSpot();
+    if (nearP >= 0 && nearT >= 0) {
+      const p = GARDEN_PLOTS[nearP];
+      const dp = Phaser.Math.Distance.Between(this.player.x, this.player.y,
+        p.col * T + PLOT_TILES_W * T / 2, p.row * T + T / 2);
+      const v = this.treeViews[nearT];
+      const dt = Phaser.Math.Distance.Between(this.player.x, this.player.y, v.x, v.y - 8);
+      this.activePlot = (dt < dp) ? -1 : nearP;
+      this.activeTree = (dt < dp) ? nearT : -1;
+    } else {
+      this.activePlot = nearP;
+      this.activeTree = nearT;
+    }
+    this.activeHenri = (this.activePlot < 0 && this.activeTree < 0) ? this.nearestHenriForChase() : false;
     this.updatePlotHint();
     this.stepRain(delta);
+    this.updateHenriCue(delta);
 
     this.readout.setText([
       `fps     ${Math.round(this.game.loop.actualFps)}`,
@@ -4177,6 +4540,7 @@ class PrairieScene extends Phaser.Scene {
     let verb = i >= 0 ? this.plotVerb(i) : '';
     const atBed = !!verb;                 // is this a garden bed, or a tree?
     if (!verb && this.activeTree >= 0) verb = this.treeVerb(this.activeTree);
+    if (!verb && this.activeHenri) verb = 'CHASE!';
 
     /* Which little picture belongs on the button, if any. Watering
        is watering whether it's a bed or a sapling, so the can shows
@@ -4196,6 +4560,29 @@ class PrairieScene extends Phaser.Scene {
     this.actionLabel.setText(verb).setVisible(!!verb);
     this.actionRing.setVisible(!!verb);
     this.actionHint.setVisible(!verb);
+
+    /* Stage 5, after playtesting: a word quietly changing on a
+       button was too easy to miss entirely. CHASE! now gets its
+       own warm color and a steady pulse, on top of the text, so
+       there's something moving to catch the eye even if he isn't
+       looking straight at the button. */
+    if (this.actionPulseTween) { this.actionPulseTween.stop(); this.actionPulseTween = null; }
+    if (verb === 'CHASE!') {
+      this.actionRing.setFillStyle(0xffe27a, 0.32).setStrokeStyle(3, 0xffe27a, 0.95);
+      this.actionLabel.setColor('#3a2a10');
+      this.actionRing.setScale(1);
+      this.actionPulseTween = this.tweens.add({
+        targets: this.actionRing,
+        scale: { from: 1, to: 1.2 },
+        duration: 420,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.InOut'
+      });
+    } else {
+      this.actionRing.setFillStyle(0xf6ecd6, 0.13).setStrokeStyle(3, 0xf6ecd6, 0.55).setScale(1);
+      this.actionLabel.setColor('#fff8e8');
+    }
 
     /* With a picture, the word shrinks and tucks in underneath it.
        Without one, the word sits in the middle of the ring exactly
@@ -4249,37 +4636,120 @@ class PrairieScene extends Phaser.Scene {
   }
 
   /* ---------------------------------------------------------
-     STAGE 4 — THE TREES
+     STAGE 4 — THE TREES  (free placement)
      ------------------------------------------------------------
-     Nine prepared spots: three on his back lawn, six out at
-     Harmon Park. The growing rules live up in the rules block
-     with the weather; everything down here is showing them on
-     screen and listening for his thumb.
+     He plants wherever he likes on open grass. The growing rules
+     live up in the rules block with the weather; everything down
+     here is deciding whether a spot will do, putting the tree on
+     screen when it goes in, and listening for his thumb.
      --------------------------------------------------------- */
 
-  /* The ring of earth, the tree standing in it, and the plaque at
-     its foot — one set per spot. Made once, when he walks in. */
-  buildTreeViews(a, areaKey) {
-    a.treeSpots.forEach(sp => {
-      // The ring is flat on the ground, so it's pinned low in the
-      // draw order and everything — him, Henri, the tree — passes
-      // in front of it.
-      const hole = this.add.image(sp.x, sp.y, 'treehole')
-        .setOrigin(0.5, 1).setScale(SCALE).setDepth(2);
-      const tree = this.add.image(sp.x, sp.y, 'tree_sapling')
-        .setOrigin(0.5, 1).setScale(SCALE).setDepth(sp.y).setVisible(false);
-      const plaque = this.add.image(sp.x + 23, sp.y + 3, 'plaque')
-        .setOrigin(0.5, 1).setScale(SCALE).setDepth(sp.y + 3).setVisible(false);
-      this.treeViews.push({
-        key: treeSpotKey(areaKey, sp.i), x: sp.x, y: sp.y, hole, tree, plaque
-      });
-    });
-
+  /* The soft ring of light that says "you're standing at a tree".
+     One per area, made when he walks in, moved around as needed. */
+  buildTreeGlow() {
     this.treeGlow = this.add.ellipse(0, 0, TREE_BLOCK[0] + 22, 28, 0xfff2c4, 0.10)
       .setVisible(false).setDepth(3);
     this.treeGlow.setStrokeStyle(3, 0xfff2c4, 0.85);
+  }
 
-    this.refreshTrees();
+  /* Put one tree on screen: the ring of turned earth at its foot,
+     the tree itself, its plaque, and the solid little box around
+     its trunk that he bumps into. Called the instant he plants
+     one, and again for each of his trees when he walks back in. */
+  addTreeView(t) {
+    // The ring is flat on the ground, so it's pinned low in the
+    // draw order and everything — him, Henri, the tree — passes
+    // in front of it.
+    const hole = this.add.image(t.x, t.y, 'treehole')
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(2);
+    const tree = this.add.image(t.x, t.y, 'tree_sapling')
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(t.y).setVisible(false);
+    const plaque = this.add.image(t.x + 23, t.y + 3, 'plaque')
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(t.y + 3).setVisible(false);
+
+    /* Its trunk, made solid — sized the same as every other tree
+       in the game, so he can stand under the leaves but never
+       inside the trunk. Added to the same group of solid things
+       the fences and houses are in, so it's rebuilt and thrown
+       away with them automatically. */
+    const bx = t.x - TREE_BLOCK[0] / 2, by = t.y - TREE_BLOCK[1];
+    const z = this.add.zone(bx + TREE_BLOCK[0] / 2, by + TREE_BLOCK[1] / 2,
+                            TREE_BLOCK[0], TREE_BLOCK[1]);
+    this.blockers.add(z);
+    z.body.updateFromGameObject();
+
+    this.treeViews.push({ id: t.id, x: t.x, y: t.y, hole, tree, plaque, zone: z });
+    return this.treeViews[this.treeViews.length - 1];
+  }
+
+  /* His trees standing in the area he's in right now. */
+  treesHere() {
+    return this.garden.trees.filter(t => t.ar === this.areaKey);
+  }
+
+  /* One particular tree, by its own name. */
+  treeById_(id) {
+    return this.garden.trees.find(t => t.id === id) || null;
+  }
+
+  /* ---- can a tree go here? ----------------------------------
+     Five plain questions, all of which have to answer yes. If any
+     one says no he gets a friendly nudge and nothing is planted.
+     Takes the spot in screen pixels — the middle of where the
+     trunk would sit. */
+  canPlantAt(x, y) {
+    const a = this.area;
+    if (!a) return false;
+
+    // 1. is it inside the map at all?
+    if (x < T || y < T || x > (a.w - 1) * T || y > (a.h - 1) * T) return false;
+
+    /* 2. is the ground under it plain turf? Checked across the
+       whole width of the trunk, not just the middle, so half a
+       tree can't hang out over a path. */
+    const half = TREE_BLOCK[0] / 2;
+    for (const px of [x - half, x, x + half]) {
+      const col = Math.floor(px / T), row = Math.floor((y - 1) / T);
+      if (col < 0 || row < 0 || col >= a.w || row >= a.h) return false;
+      if (!PLANTABLE_GROUND[a.get(col, row)]) return false;
+    }
+
+    // 3. is anything already standing there — a house, a fence,
+    //    the big oak, a bush, a garden bed?
+    const bx = x - half, by = y - TREE_BLOCK[1];
+    const bw = TREE_BLOCK[0], bh = TREE_BLOCK[1];
+    for (const s of a.solids) {
+      if (bx < s.x + s.w && bx + bw > s.x && by < s.y + s.h && by + bh > s.y) return false;
+    }
+
+    /* 4. is it a full canopy clear of his other trees? This is
+       what keeps a grove looking like a grove instead of two
+       trunks in one hole. */
+    for (const t of this.treesHere()) {
+      if (Phaser.Math.Distance.Between(x, y, t.x, t.y) < TREE_CANOPY) return false;
+    }
+
+    /* 5. is it clear of the ways out and the signs? A tree over a
+       doorway or in front of a sign would be a small disaster
+       that he could never undo. */
+    for (const e of a.exits) {
+      if (bx < e.x + e.w + T && bx + bw > e.x - T &&
+          by < e.y + e.h + T && by + bh > e.y - T) return false;
+    }
+    for (const s of a.signs) {
+      if (Phaser.Math.Distance.Between(x, y, s.x, s.y) < 100) return false;
+    }
+
+    return true;
+  }
+
+  /* Where a tree would land if he planted one right now: one map
+     square in front of him, in the direction he's looking. Never
+     under his own feet — the trunk is solid, and a solid box
+     appearing on top of him would shove him sideways. */
+  plantTarget() {
+    const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[this.facing] || [0, 1];
+    return { x: this.player.x + d[0] * TREE_REACH, y: this.player.y + d[1] * TREE_REACH };
   }
 
   /* Redraw every spot from the saved numbers. Called after any
@@ -4288,7 +4758,7 @@ class PrairieScene extends Phaser.Scene {
   refreshTrees() {
     if (!this.treeViews || !this.treeViews.length) return;
     this.treeViews.forEach(v => {
-      const t = this.garden.trees[v.key];
+      const t = this.treeById_(v.id);
       if (!t) { v.tree.setVisible(false); v.plaque.setVisible(false); return; }
 
       const sp = treeById(t.sp);
@@ -4306,7 +4776,10 @@ class PrairieScene extends Phaser.Scene {
     });
   }
 
-  /* Which planting spot is he standing at? -1 for none. */
+  /* Which of his planted trees is he standing at? -1 for none.
+     Same nearest-thing-within-arm's-reach test as before; it just
+     runs down the trees he's actually planted here rather than a
+     fixed list of nine holes. */
   nearestTreeSpot() {
     if (!this.treeViews || !this.treeViews.length) return -1;
     let best = -1, bestD = 96;
@@ -4317,10 +4790,12 @@ class PrairieScene extends Phaser.Scene {
     return best;
   }
 
-  /* What the one action button will do if he presses it now. */
+  /* What the one action button will do if he presses it now.
+     Never PLANT — there is nothing to plant AT any more, and
+     planting has its own little button of its own. */
   treeVerb(i) {
-    const t = this.garden.trees[this.treeViews[i].key];
-    if (!t) return 'PLANT';
+    const t = this.treeById_(this.treeViews[i].id);
+    if (!t) return '';
     if (t.st === 0 && !t.wat) return 'WATER';
     if (!t.ded) return 'DEDICATE';
     return 'READ';
@@ -4328,10 +4803,9 @@ class PrairieScene extends Phaser.Scene {
 
   doTreeAction(i) {
     const v = this.treeViews[i];
-    const t = this.garden.trees[v.key];
+    const t = this.treeById_(v.id);
+    if (!t) return;
     const verb = this.treeVerb(i);
-
-    if (verb === 'PLANT') { this.openTreeMenu(v.key); return; }
 
     if (verb === 'WATER') {
       t.wat = true; t.th = false;
@@ -4340,7 +4814,7 @@ class PrairieScene extends Phaser.Scene {
       return;
     }
 
-    if (verb === 'DEDICATE') { this.openDedicationBox(v.key); return; }
+    if (verb === 'DEDICATE') { this.openDedicationBox(v.id); return; }
 
     // READ — his own words, with a way back in to fix a typo,
     // because a memorial he can't correct would be a cruel thing
@@ -4349,31 +4823,48 @@ class PrairieScene extends Phaser.Scene {
       title: '“' + t.ded + '”',
       subtitle: treeById(t.sp).name +
                 (t.pd ? '  ·  planted ' + prettyDay(t.pd) : ''),
-      rows: [{ label: 'Change the words', pick: () => this.openDedicationBox(v.key) }],
+      rows: [{ label: 'Change the words', pick: () => this.openDedicationBox(v.id) }],
       cancel: 'Close'
     });
   }
 
-  openTreeMenu(key) {
+  /* The species list, opened from the little Plant a Tree button.
+     Nothing is checked yet — he's allowed to browse the five
+     natives from anywhere. The spot is judged when he picks one. */
+  openTreeMenu() {
     this.openChoiceMenu({
       title: 'What shall we plant here?',
       subtitle: 'Five natives · all of them do well in Kansas',
       rows: TREES.map(t => ({
         label: t.name,
         sub: t.blurb,
-        pick: () => this.plantTree(key, t.id)
+        pick: () => this.plantTree(t.id)
       })),
       cancel: 'Never mind'
     });
   }
 
-  plantTree(key, speciesId) {
-    this.garden.trees[key] = newTree(speciesId, this.garden.day);
+  plantTree(speciesId) {
+    /* Judged here, at the moment he commits, rather than when the
+       menu opened — he may have been nudged along by a collision
+       in between, and what matters is where he's standing now. */
+    const spot = this.plantTarget();
+    if (!this.canPlantAt(spot.x, spot.y)) {
+      this.toast('That spot’s a little crowded — try some open grass.', 2600);
+      return;
+    }
+
+    const t = newTree(speciesId, this.garden.day, this.areaKey, spot.x, spot.y);
     // If it's raining right now, the rain waters the new sapling the
     // moment it goes in — exactly as a seed planted today lands in
     // soil the rain already wet. Without this, a tree planted in the
     // rain would ask for the watering can while the sky did the job.
-    if (this.weatherToday === 'rainy') this.garden.trees[key].wat = true;
+    if (this.weatherToday === 'rainy') t.wat = true;
+
+    this.garden.trees.push(t);
+    // it has to appear on screen and become solid right now — no
+    // map reload is coming to do it for us any more
+    this.addTreeView(t);
     this.commitTrees();
     this.toast('Planted a ' + treeById(speciesId).name.toLowerCase() +
                '. Keep it watered while it takes.', 3000);
@@ -4383,14 +4874,14 @@ class PrairieScene extends Phaser.Scene {
        up at him. That's also what makes the keyboard work: on a
        phone it will only open in answer to a tap. */
     this.time.delayedCall(1100, () => {
-      if (this.menuOpen || !this.garden.trees[key]) return;
+      if (this.menuOpen || !this.treeById_(t.id)) return;
       this.openChoiceMenu({
         title: 'Dedicate this tree?',
         subtitle: treeById(speciesId).name,
         rows: [{
           label: 'Write a few words',
           sub: 'A small plaque at its foot',
-          pick: () => this.openDedicationBox(key)
+          pick: () => this.openDedicationBox(t.id)
         }],
         cancel: 'Not now'
       });
@@ -4409,9 +4900,9 @@ class PrairieScene extends Phaser.Scene {
      real text box is the only thing that will bring up the
      phone's keyboard. Everything else about it — the colours,
      the border — is made to match the panels around it. */
-  openDedicationBox(key) {
+  openDedicationBox(id) {
     if (this.menuOpen) return;
-    const t = this.garden.trees[key];
+    const t = this.treeById_(id);
     if (!t) return;
 
     this.menuOpen = true;
@@ -4509,7 +5000,7 @@ class PrairieScene extends Phaser.Scene {
     };
     const commit = () => {
       const words = cleanDedication(input.value);
-      const tree = this.garden.trees[key];
+      const tree = this.treeById_(id);
       close();
       if (!tree) return;
       tree.ded = words || null;
@@ -4920,6 +5411,453 @@ class PrairieScene extends Phaser.Scene {
 
     this.henri.setDepth(this.henri.y - 2);
     this.henriShadow.setPosition(this.henri.x, this.henri.y - 2).setDepth(this.henri.y - 3);
+  }
+
+  /* ---------------------------------------------------------
+     STAGE 5 — THE RABBIT CHASE
+     ------------------------------------------------------------
+     Henri's own mini-game. A rabbit "appears" (the idle cue
+     sprite, near the middle of the open lawn) every so often
+     while he's puttering in the backyard; standing near Henri and
+     pressing the one action button sends him off after it. For
+     the length of the chase, the joystick drives Henri directly
+     instead of following — three rabbits spawn, flee whenever
+     he's close, and count as "herded off" the moment they're
+     pushed past the edge of the play patch. Nothing here is saved
+     — it's a live bit of fun, not a system, and it can be played
+     again as soon as the cooldown clears.
+     --------------------------------------------------------- */
+
+  /* The open part of the fenced backyard lawn — inside the fence
+     line on every side (the fence itself sits at col 4, col 31,
+     and row 2). yMax is deliberately well short of the fence,
+     though: the house is one tall image, depth-sorted by its
+     base at row 21, and its roof peak actually reaches all the
+     way up to row 14 (checked directly against the art: 112 rows
+     tall, 3x scale, anchored at row 21 → 336px tall → top edge at
+     row 21 - 7 = row 14). Anyone standing anywhere in that band,
+     even well out in the open yard, gets drawn behind the whole
+     house rather than in front of it — normally a nice touch (you
+     can duck behind a roofline the same as a tree), but during a
+     fast-moving chase it meant losing track of everyone for long
+     stretches. Row 12.5 keeps a buffer clear of it. Henri and
+     Mike also get a hard stop at yMax during the chase (see
+     updateChase/updateMikeChase) rather than relying on collision
+     alone to keep them out of that band. */
+  chaseZone() {
+    return { xMin: 5.5 * T, xMax: 29.5 * T, yMin: 3.5 * T, yMax: 12.5 * T };
+  }
+
+  /* Counts down while he's puttering in the backyard; when it
+     runs out, the cue rabbit appears and stays until he starts
+     the chase (or leaves the yard, which just pauses the clock
+     rather than cancelling it).
+
+     Revised after playtesting: the cue used to appear at a fixed
+     spot in the yard, which meant it was easy to never walk past
+     it at all. It now appears right next to wherever Henri
+     already is — since Henri is almost always near him — plus a
+     one-time announcement and a gentle continuous bounce, so
+     there's no missing that something's happening. */
+  updateHenriCue(delta) {
+    if (!RABBIT_CHASE_ENABLED) return; // minigame paused — see the note by RABBIT_CHASE_ENABLED up top
+    if (this.areaKey !== 'home' || this.chaseActive) {
+      if (this.henriCue.visible) this.hideHenriCue();
+      return;
+    }
+    if (this.henriChaseReady) {
+      // Keep it pinned near Henri — he may well have wandered
+      // since the moment it appeared.
+      this.henriCue.setPosition(this.henri.x - 24, this.henri.y).setDepth(this.henri.y + 1);
+      return;
+    }
+    this.henriChaseCooldown -= delta;
+    if (this.henriChaseCooldown <= 0) {
+      this.henriChaseReady = true;
+      this.henriCue
+        .setPosition(this.henri.x - 24, this.henri.y)
+        .setDepth(this.henri.y + 1)
+        .setScale(1).setVisible(true);
+      this.henriCueTween = this.tweens.add({
+        targets: this.henriCue,
+        scale: { from: 1, to: 1.18 },
+        duration: 480,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.InOut'
+      });
+      this.toast("A rabbit's in the yard — walk up to Henri and tap the button!", 3400);
+    }
+  }
+
+  hideHenriCue() {
+    if (this.henriCueTween) { this.henriCueTween.stop(); this.henriCueTween = null; }
+    this.henriCue.setScale(1).setVisible(false);
+  }
+
+  /* Is he standing close enough to Henri, with a rabbit about,
+     to have the action button start the chase? */
+  nearestHenriForChase() {
+    if (this.areaKey !== 'home' || this.chaseActive || !this.henriChaseReady) return false;
+    return Phaser.Math.Distance.Between(this.player.x, this.player.y, this.henri.x, this.henri.y) < 72;
+  }
+
+  startRabbitChase() {
+    this.chaseActive = true;
+    this.updatePlantButton();   // the chase gets the whole screen
+    this.henriChaseReady = false;
+    this.hideHenriCue();
+    this.chaseTimeLeft = 45000;   // shortened from 75s after playtesting — more of a challenge
+    this.rabbitsHerded = 0;
+
+    // The action button plays no part during the chase — the whole
+    // screen is movement for Henri now — so it stands down rather
+    // than sitting there mid-glow with nothing to press it for.
+    if (this.actionPulseTween) { this.actionPulseTween.stop(); this.actionPulseTween = null; }
+    this.actionRing.setVisible(false).setScale(1).setFillStyle(0xf6ecd6, 0.13).setStrokeStyle(3, 0xf6ecd6, 0.55);
+    this.actionLabel.setVisible(false).setColor('#fff8e8');
+    this.actionIcon.setVisible(false);
+    this.actionHint.setVisible(false);
+    this.actionVerbShown = null;
+
+    /* Fixed after playtesting: everyone — him, Henri, the rabbits —
+       was ignoring the garden beds, trees, bench and house during
+       the chase, which felt wrong given they all respect those the
+       rest of the time. Mike's own collider (already set up for
+       normal play) just needed to stay switched on. Henri and each
+       rabbit get a physics body of their own, for the length of the
+       chase only, with a collider against the same `this.blockers`
+       everything else in the yard already bumps into. */
+    if (!this.henri.body) {
+      this.physics.add.existing(this.henri);
+      this.henri.body.setSize(28, 14).setOffset(12, 24);
+      this.henri.body.setCollideWorldBounds(true);
+    }
+    this.henriChaseCollider = this.physics.add.collider(this.henri, this.blockers);
+
+    const z = this.chaseZone();
+    // Scattered near wherever Henri already is, not flung across
+    // the whole (now much bigger) yard — so the chase starts right
+    // away instead of him hunting for them first.
+    //
+    // Fixed Aug 7: starting the chase wherever the player happens to
+    // be is the right call, but it means Henri can just as easily be
+    // standing right up against the fence as out in the open. The
+    // old spawn scattered rabbits in a full circle around him and
+    // only clamped them 20px in from the edge afterward — right up
+    // against the fence, that's no running room at all, and since
+    // rabbits flee straight away from Henri, "away" often pointed
+    // straight out of bounds. They'd cross the escape line within a
+    // fraction of a second and just seem to vanish.
+    //
+    // Now they fan out in a wide cone pointed toward the middle of
+    // the yard (wherever that is relative to Henri, not a fixed
+    // direction) rather than scattering all the way around him, and
+    // the clamp margin is much bigger. So no matter which corner of
+    // the yard the chase starts in, every rabbit spawns with real
+    // room to run before it's anywhere near "escaped."
+    const zCenterX = (z.xMin + z.xMax) / 2, zCenterY = (z.yMin + z.yMax) / 2;
+    const toYardCenter = Math.atan2(zCenterY - this.henri.y, zCenterX - this.henri.x);
+    const SPAWN_MARGIN = 65; // was 20 — real running room before the escape line
+    this.chaseRabbits = [];
+    for (let i = 0; i < 3; i++) {
+      const a = toYardCenter + (i - 1) * (Math.PI / 3) + (Math.random() - 0.5) * 0.5;
+      const d = 110 + Math.random() * 130;
+      const x = Phaser.Math.Clamp(this.henri.x + Math.cos(a) * d, z.xMin + SPAWN_MARGIN, z.xMax - SPAWN_MARGIN);
+      const y = Phaser.Math.Clamp(this.henri.y + Math.sin(a) * d, z.yMin + SPAWN_MARGIN, z.yMax - SPAWN_MARGIN);
+      const shadow = this.add.ellipse(x, y - 1, 15 * CRITTER_SCALE, 6 * CRITTER_SCALE, 0x1d2b16, 0.22);
+      const spr = this.add.image(x, y, 'rabbit_idle_left').setOrigin(0.5, 1);
+      this.physics.add.existing(spr);
+      spr.body.setSize(18, 12).setOffset((spr.width - 18) / 2, spr.height - 14);
+      const collider = this.physics.add.collider(spr, this.blockers);
+      this.chaseRabbits.push({ spr, shadow, collider, wanderT: 0, wvx: 0, wvy: 0 });
+    }
+
+    this.henriTrail = [];
+
+    // Nice-to-have, added Aug 6: rather than standing frozen, Mike
+    // now jogs along behind Henri for the length of the chase — the
+    // exact same trail-and-lag trick that normally has Henri follow
+    // Mike, just pointed the other way (see updateMikeChase below).
+    this.mikeTrail = [];
+
+    // The camera was only ever following him — for the length of
+    // the chase it follows Henri instead, so the view actually
+    // scrolls along with the dog you're now steering.
+    this.cameras.main.stopFollow();
+    this.cameras.main.startFollow(this.henri, true, 0.14, 0.14);
+
+    this.updateChaseHUD();
+    this.chaseBox.setVisible(true);
+    this.chaseText.setVisible(true);
+    this.toast("Henri's off! Herd all three rabbits out of the yard.", 2800);
+  }
+
+  /* Runs instead of the normal update() body for as long as the
+     chase is on — see the early return up top. */
+  updateChase(delta) {
+    let vx = this.stickVector.x, vy = this.stickVector.y;
+    if (this.keys.left.isDown || this.wasd.A.isDown) vx = -1;
+    else if (this.keys.right.isDown || this.wasd.D.isDown) vx = 1;
+    if (this.keys.up.isDown || this.wasd.W.isDown) vy = -1;
+    else if (this.keys.down.isDown || this.wasd.S.isDown) vy = 1;
+    const dir = this.resolveDirection(vx, vy);
+
+    // Driven by his own physics body now (see startRabbitChase),
+    // so the real fence and the garden beds/trees/bench actually
+    // stop him, the same as they do the rest of the time — no more
+    // hand-rolled rectangle standing in for the yard's real edges.
+    const speed = 210;
+    this.henri.body.setVelocity(dir.x * speed, dir.y * speed);
+
+    const moving = dir.x !== 0 || dir.y !== 0;
+    if (moving) {
+      if (Math.abs(dir.x) > Math.abs(dir.y)) this.henriFacing = dir.x > 0 ? 'right' : 'left';
+      else this.henriFacing = dir.y > 0 ? 'down' : 'up';
+    }
+    const dirKey = this.henriFacing === 'right' ? 'left' : this.henriFacing;
+    this.henri.setFlipX(this.henriFacing === 'right');
+    if (moving) {
+      const anim = 'henri-walk-' + dirKey;
+      const cur = this.henri.anims.currentAnim;
+      if (!cur || cur.key !== anim || !this.henri.anims.isPlaying) this.henri.play(anim, true);
+    } else {
+      this.henri.anims.stop();
+      this.henri.setFrame(dirKey + 'Sit');
+    }
+
+    // Hard stop at the house-avoidance line — see the long note on
+    // chaseZone() above. Collision keeps him out of the beds/trees/
+    // bench/fence; this keeps him out of the one band where he'd
+    // vanish behind the house's roof.
+    this.henri.y = Math.min(this.henri.y, this.chaseZone().yMax);
+
+    this.henri.setDepth(this.henri.y);
+    this.henriShadow.setPosition(this.henri.x, this.henri.y - 1).setDepth(this.henri.y - 1);
+
+    this.updateMikeChase(delta);
+
+    this.chaseRabbits.forEach(r => this.updateChaseRabbit(r, delta));
+    this.chaseRabbits = this.chaseRabbits.filter(r => !r.escaped);
+
+    this.chaseTimeLeft -= delta;
+    this.updateChaseHUD();
+
+    if (this.rabbitsHerded >= 3) { this.endChase(true); return; }
+    if (this.chaseTimeLeft <= 0) { this.endChase(false); return; }
+  }
+
+  /* Nice-to-have, added Aug 6: Mike jogging along behind Henri
+     instead of standing frozen. This is updateHenri() (further
+     down) with the two of them swapped — Henri lays down a trail,
+     Mike walks it a beat behind, same lag-distance trick either
+     way. Moved by body.reset() rather than velocity, matching how
+     the rest of the chase (Henri, the rabbits) all move by just
+     setting position directly rather than through physics. */
+  updateMikeChase(delta) {
+    const trail = this.mikeTrail;
+    const last = trail[trail.length - 1];
+    if (!last || Phaser.Math.Distance.Between(last.x, last.y, this.henri.x, this.henri.y) > 8) {
+      trail.push({ x: this.henri.x, y: this.henri.y });
+      if (trail.length > 240) trail.shift();
+    }
+
+    const FOLLOW_LAG = T * 1.3;
+    let target = { x: this.henri.x, y: this.henri.y };
+    let remaining = FOLLOW_LAG;
+    let px = this.henri.x, py = this.henri.y;
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i];
+      const segLen = Phaser.Math.Distance.Between(px, py, p.x, p.y);
+      if (segLen >= remaining) {
+        const t = segLen > 0 ? remaining / segLen : 0;
+        target = { x: Phaser.Math.Linear(px, p.x, t), y: Phaser.Math.Linear(py, p.y, t) };
+        remaining = -1;
+        break;
+      }
+      remaining -= segLen;
+      target = { x: p.x, y: p.y };
+      px = p.x; py = p.y;
+    }
+
+    // safety net, same reasoning as Henri's own: if he's somehow
+    // been left miles behind, just bring him along
+    const distToHenri = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.henri.x, this.henri.y);
+    if (distToHenri > T * 7) this.player.body.reset(target.x, target.y);
+
+    const dx = target.x - this.player.x, dy = target.y - this.player.y;
+    const dist = Math.hypot(dx, dy);
+    const MIKE_CHASE_SPEED = 230;
+
+    /* Fixed after playtesting: this used to pick his facing straight
+       off the raw dx/dy toward the lag target, which — unlike every
+       other bit of movement in the game — was never snapped to a
+       compass direction first. A "chase a moving point" vector is
+       noisy frame to frame, so near a diagonal it would flicker
+       between two walk animations rather than settling on one.
+       Running it through the same 8-direction snap the joystick
+       itself uses fixes that. It also now moves through his normal
+       physics body (setVelocity, not a manual teleport each frame),
+       so the fences/beds/trees block him again during the chase,
+       same as they do the rest of the time. */
+    let moving = false;
+    if (dist > 3) {
+      const dir = this.resolveDirection(dx, dy);
+      this.player.body.setVelocity(dir.x * MIKE_CHASE_SPEED, dir.y * MIKE_CHASE_SPEED);
+      moving = dir.x !== 0 || dir.y !== 0;
+      if (moving) {
+        if (Math.abs(dir.x) > Math.abs(dir.y)) this.facing = dir.x > 0 ? 'right' : 'left';
+        else this.facing = dir.y > 0 ? 'down' : 'up';
+      }
+    } else {
+      this.player.body.setVelocity(0, 0);
+    }
+
+    if (moving) {
+      const anim = 'walk-' + this.facing;
+      const cur = this.player.anims.currentAnim;
+      if (!cur || cur.key !== anim || !this.player.anims.isPlaying) this.player.play(anim, true);
+    } else {
+      this.player.anims.stop();
+      this.player.setFrame(this.facing + '0');
+    }
+
+    // Same house-avoidance line Henri gets — see chaseZone().
+    this.player.y = Math.min(this.player.y, this.chaseZone().yMax);
+
+    this.player.setDepth(this.player.y);
+    this.shadow.setPosition(this.player.x, this.player.y - 3).setDepth(this.player.y - 1);
+  }
+
+  /* One rabbit's thinking, every frame: sit tight until Henri
+     gets close, then bolt straight away from him. The moment it
+     crosses out of the play patch, it's counted as herded off —
+     no separate "catch" step, since chasing IS the herding. */
+  updateChaseRabbit(r, delta) {
+    const z = this.chaseZone();
+    // r.spr.x/y is now the one true position — his physics body
+    // resolves it against the fences/beds/trees each step, so
+    // there's no separate tracked x/y to keep in sync with it.
+    const dx = r.spr.x - this.henri.x, dy = r.spr.y - this.henri.y;
+    const dist = Math.hypot(dx, dy);
+    const FLEE_RADIUS = 150;
+    let vx = 0, vy = 0, speed;
+
+    if (dist < FLEE_RADIUS && dist > 0.01) {
+      vx = dx / dist; vy = dy / dist;
+      speed = 155;
+      r.wanderT = 0;
+    } else {
+      r.wanderT -= delta;
+      if (r.wanderT <= 0) {
+        r.wanderT = 700 + Math.random() * 900;
+        if (Math.random() < 0.4) { r.wvx = 0; r.wvy = 0; }
+        else {
+          const a = Math.random() * Math.PI * 2;
+          r.wvx = Math.cos(a); r.wvy = Math.sin(a);
+        }
+      }
+      vx = r.wvx; vy = r.wvy;
+      speed = 45;
+    }
+
+    r.spr.body.setVelocity(vx * speed, vy * speed);
+
+    const hopping = Math.abs(vx) > 0.15 || Math.abs(vy) > 0.15;
+    if (hopping) {
+      let key, flip = false;
+      if (Math.abs(vx) >= Math.abs(vy)) { key = 'rabbit_hop_left'; flip = vx > 0; }
+      else key = vy > 0 ? 'rabbit_hop_down' : 'rabbit_hop_up';
+      r.spr.setTexture(key).setFlipX(flip);
+    } else {
+      r.spr.setTexture('rabbit_idle_left');
+    }
+    r.shadow.setPosition(r.spr.x, r.spr.y - 1).setDepth(r.spr.y - 1);
+    r.spr.setDepth(r.spr.y);
+
+    if (r.spr.x < z.xMin || r.spr.x > z.xMax || r.spr.y < z.yMin || r.spr.y > z.yMax) {
+      r.escaped = true;
+      this.rabbitsHerded++;
+
+      /* Made bigger, brighter and slower after playtesting — the
+         original single small circle was easy to miss if he
+         wasn't looking right at it. A warm filled core plus an
+         expanding ring reads much more clearly against the grass. */
+      const px = r.spr.x, py = r.spr.y - 10;
+      const puff = this.add.circle(px, py, 7, 0xfff6df, 0.92).setDepth(9500);
+      const ring = this.add.circle(px, py, 4, 0xffffff, 0).setDepth(9501);
+      ring.setStrokeStyle(3, 0xfff6df, 0.95);
+      this.tweens.add({
+        targets: puff, scale: { from: 0.5, to: 2.8 }, alpha: { from: 0.92, to: 0 },
+        duration: 550, ease: 'Quad.Out', onComplete: () => puff.destroy()
+      });
+      this.tweens.add({
+        targets: ring, scale: { from: 0.6, to: 3.6 }, alpha: { from: 0.95, to: 0 },
+        duration: 650, ease: 'Quad.Out', onComplete: () => ring.destroy()
+      });
+
+      if (r.collider) r.collider.destroy();
+      r.spr.destroy();
+      r.shadow.destroy();
+    }
+  }
+
+  updateChaseHUD() {
+    const secs = Math.max(0, Math.ceil(this.chaseTimeLeft / 1000));
+    const left = 3 - this.rabbitsHerded;
+    this.chaseText.setText(
+      'Herding rabbits — ' + left + ' left     0:' + String(secs).padStart(2, '0')
+    );
+    const b = this.chaseText.getBounds();
+    this.chaseBox.setSize(b.width + 30, b.height + 18);
+  }
+
+  /* Win or lose, nothing is punished — the rabbits just get away
+     if the clock runs out, same "kindness over punishment" rule
+     as the garden. A win gives one small, self-contained reward
+     rather than reaching into the not-yet-built Park Points
+     system: Henri knocks over the water can on his way back,
+     which waters whatever's currently planted for free. */
+  endChase(won) {
+    this.chaseActive = false;
+    this.updatePlantButton();   // and hands it back afterwards
+    this.chaseRabbits.forEach(r => {
+      if (r.collider) r.collider.destroy();
+      r.spr.destroy();
+      r.shadow.destroy();
+    });
+    this.chaseRabbits = [];
+    this.chaseBox.setVisible(false);
+    this.chaseText.setVisible(false);
+
+    // Hand the camera back to him. His own collider was never
+    // switched off, so nothing to restore there — just Henri's
+    // chase-only collider and body coming to a stop.
+    this.cameras.main.stopFollow();
+    this.cameras.main.startFollow(this.player, true, 0.14, 0.14);
+    this.player.body.setVelocity(0, 0);
+    if (this.henriChaseCollider) { this.henriChaseCollider.destroy(); this.henriChaseCollider = null; }
+    if (this.henri.body) this.henri.body.setVelocity(0, 0);
+
+    this.henriTrail = [];
+    this.henriState = 'sit';
+    this.henriChaseCooldown = pickChaseCooldown();
+    this.actionVerbShown = null;   // so the button re-reads itself now that he's back in charge
+
+    if (won) {
+      let watered = 0;
+      this.garden.plots.forEach(p => { if (p.seed && !p.watered) { p.watered = true; watered++; } });
+      if (watered > 0) this.commitGarden();
+      this.toast(
+        'Henri herded all three rabbits out of the yard!' +
+        (watered > 0
+          ? ' He knocked over the watering can on the way back — free watering today.'
+          : ' Good boy, Henri.'),
+        3800
+      );
+    } else {
+      this.toast('The rabbits got away this time — Henri had fun anyway.', 3000);
+    }
   }
 }
 
