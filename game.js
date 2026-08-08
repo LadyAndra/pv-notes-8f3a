@@ -3567,6 +3567,39 @@ const AREAS = {
    action button; and the same fade the game already uses to
    move between areas.
    ============================================================ */
+/* ---- Where it's safe to put things -------------------------------
+
+   The artwork now fills the whole screen, including the strip behind
+   the notch and the strip behind the home bar. Grass looks perfectly
+   fine under there. Buttons and words do not — they'd be clipped by
+   the notch or sat under the home bar where you can't tap them.
+
+   So: draw the world across the FULL screen, but lay every control
+   and every piece of text out inside this rectangle instead. On a
+   plain screen with no notch it's simply the whole screen, so
+   nothing moves. On a notched iPhone in landscape it's inset by
+   62px on each side and 20px at the bottom.
+
+   Returns the safe rectangle plus its centre, so layout code can
+   say safe.cx instead of w / 2 and stay honest on every device. */
+function safeArea(scene) {
+  const w = scene.scale.width, h = scene.scale.height;
+  const s = window.PV_SAFE || { left: 0, right: 0, top: 0, bottom: 0 };
+
+  // Never let a bad reading eat more than a third of the screen —
+  // a safety net, so the game can't end up crammed into a corner.
+  const cap = (v, limit) => Math.max(0, Math.min(v || 0, limit));
+  const l = cap(s.left, w / 3), r = cap(s.right, w / 3);
+  const t = cap(s.top, h / 3), b = cap(s.bottom, h / 3);
+
+  const x = l, y = t, sw = Math.max(1, w - l - r), sh = Math.max(1, h - t - b);
+  return {
+    x: x, y: y, w: sw, h: sh,
+    right: x + sw, bottom: y + sh,
+    cx: x + sw / 2, cy: y + sh / 2
+  };
+}
+
 class TitleScene extends Phaser.Scene {
   constructor() { super('title'); }
 
@@ -3645,7 +3678,11 @@ class TitleScene extends Phaser.Scene {
      fixed coordinate, for the same reason the Plant button
      isn't one. */
   layout() {
-    const w = this.scale.width, h = this.scale.height;
+    // The title picture and its two lines of text sit inside the
+    // safe area, so nothing is clipped by the notch. The dark
+    // background behind them still fills the whole screen.
+    const safe = safeArea(this);
+    const w = safe.w, h = safe.h;
     const sz = this.artSize;
 
     // biggest whole-number scale that still leaves room for the
@@ -3665,12 +3702,12 @@ class TitleScene extends Phaser.Scene {
     const tapH = this.tapText.height;
     const total = artH + gapA + titleH + gapB + tapH;
 
-    let y = Math.round(h / 2 - total / 2);
-    this.art.setPosition(Math.round(w / 2), y + artH / 2);
+    let y = Math.round(safe.cy - total / 2);
+    this.art.setPosition(Math.round(safe.cx), y + artH / 2);
     y += artH + gapA;
-    this.titleText.setPosition(Math.round(w / 2), y + titleH / 2);
+    this.titleText.setPosition(Math.round(safe.cx), y + titleH / 2);
     y += titleH + gapB;
-    this.tapText.setPosition(Math.round(w / 2), y + tapH / 2);
+    this.tapText.setPosition(Math.round(safe.cx), y + tapH / 2);
   }
 
   /* The same fade the game uses to walk between areas. */
@@ -4358,9 +4395,17 @@ class PrairieScene extends Phaser.Scene {
   }
 
   layoutControls() {
-    const w = this.scale.width, h = this.scale.height;
-    this.actionX = w * 0.75;
-    this.actionY = h * 0.62;
+    /* Everything in here is placed relative to the SAFE rectangle,
+       not the whole screen. The world behind it still fills the
+       screen edge to edge — it's only the things you look at and
+       tap that keep their distance from the notch and home bar.
+       On a screen without a notch the safe rectangle IS the whole
+       screen, so every one of these lands exactly where it always
+       did. */
+    const safe = safeArea(this);
+    const w = safe.w, h = safe.h;
+    this.actionX = safe.x + w * 0.75;
+    this.actionY = safe.y + h * 0.62;
     this.actionHint.setPosition(this.actionX, this.actionY);
     this.actionRing.setPosition(this.actionX, this.actionY);
     this.actionLabel.setPosition(this.actionX, this.actionY);
@@ -4368,7 +4413,7 @@ class PrairieScene extends Phaser.Scene {
     // force the button to re-read itself, so the word and the
     // picture line themselves up again at the new size
     this.actionVerbShown = null;
-    this.readout.setPosition(10, 10);
+    this.readout.setPosition(safe.x + 10, safe.y + 10);
 
     /* The Plant button, tucked into the top-right corner. Anchored
        to the live right edge of the play area with a 16px margin,
@@ -4381,17 +4426,18 @@ class PrairieScene extends Phaser.Scene {
     const pad = PLANT_BTN_MARGIN;
     const pw = Math.min(PLANT_BTN_SIZE, Math.max(44, w - pad * 2));
     const ph = PLANT_BTN_SIZE;
-    const rightEdge = w - pad;
+    const rightEdge = safe.right - pad;
+    const topEdge = safe.y + pad;
     this.plantBtn.setSize(pw, ph);
-    this.plantRect = { x: rightEdge - pw, y: pad, w: pw, h: ph };
-    this.plantBtn.setPosition(rightEdge, pad);
-    this.plantBtnIcon.setPosition(rightEdge - pw / 2, pad + ph / 2);
+    this.plantRect = { x: rightEdge - pw, y: topEdge, w: pw, h: ph };
+    this.plantBtn.setPosition(rightEdge, topEdge);
+    this.plantBtnIcon.setPosition(rightEdge - pw / 2, topEdge + ph / 2);
 
-    this.areaLabel.setPosition(w * 0.5, 52);
-    this.msgText.setPosition(w * 0.5, h - 52);
-    this.msgBox.setPosition(w * 0.5, h - 52);
-    this.chaseText.setPosition(w * 0.5, 94);
-    this.chaseBox.setPosition(w * 0.5, 94);
+    this.areaLabel.setPosition(safe.cx, safe.y + 52);
+    this.msgText.setPosition(safe.cx, safe.bottom - 52);
+    this.msgBox.setPosition(safe.cx, safe.bottom - 52);
+    this.chaseText.setPosition(safe.cx, safe.y + 94);
+    this.chaseBox.setPosition(safe.cx, safe.y + 94);
   }
 
   /* Show the Plant button only where planting means something:
@@ -4452,7 +4498,11 @@ class PrairieScene extends Phaser.Scene {
       }
     }
 
-    if (p.x >= this.scale.width * 0.5) { this.pressAction(p.x, p.y); return; }
+    // Right half = do something, left half = walk. Split down the
+    // middle of the safe area rather than the middle of the screen,
+    // so the two halves stay the same size as each other even when
+    // the notch takes a bite out of one side.
+    if (p.x >= safeArea(this).cx) { this.pressAction(p.x, p.y); return; }
     if (this.stickPointerId === null) {
       this.stickPointerId = p.id;
       this.stickBase.setPosition(p.x, p.y).setVisible(true);
@@ -5181,7 +5231,13 @@ class PrairieScene extends Phaser.Scene {
     wrap.style.cssText =
       'position:fixed;top:0;left:0;right:0;bottom:0;z-index:60;display:flex;' +
       'align-items:center;justify-content:center;background:rgba(18,12,6,0.78);' +
-      'padding:12px;box-sizing:border-box;touch-action:auto;' +
+      // 12px of breathing room, plus however much the notch and the
+      // home bar need on this particular phone.
+      'padding:calc(12px + env(safe-area-inset-top,0px))' +
+      ' calc(12px + env(safe-area-inset-right,0px))' +
+      ' calc(12px + env(safe-area-inset-bottom,0px))' +
+      ' calc(12px + env(safe-area-inset-left,0px));' +
+      'box-sizing:border-box;touch-action:auto;' +
       '-webkit-user-select:auto;user-select:auto;font-family:' + font + ';';
 
     const panel = document.createElement('div');
@@ -5326,8 +5382,11 @@ class PrairieScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(D).setInteractive();
     objs.push(veil);
 
-    const px = Math.round(w / 2), py = Math.round(h / 2);
-    const panelW = Math.min(400, w - 36);
+    // Centred on the safe area, and sized against it, so the letter
+    // never tucks part of itself behind the notch.
+    const safe = safeArea(this);
+    const px = Math.round(safe.cx), py = Math.round(safe.cy);
+    const panelW = Math.min(400, safe.w - 36);
     const wrapW = panelW - 44;
     const padY = 22;
 
@@ -5358,7 +5417,7 @@ class PrairieScene extends Phaser.Scene {
     const gap1 = 14, gap2 = 16, gap3 = 18;
     const contentH = greeting.height + gap1 + body.height + gap2 +
                      sign.height + gap3 + tap.height;
-    const panelH = Math.min(h - 24, contentH + padY * 2);
+    const panelH = Math.min(safe.h - 24, contentH + padY * 2);
 
     const panel = this.add.rectangle(px, py, panelW, panelH, 0x2b1d11, 0.98)
       .setScrollFactor(0).setDepth(D + 1);
@@ -5431,10 +5490,11 @@ class PrairieScene extends Phaser.Scene {
 
     const nRows = opts.rows.length + 1;
     const head = opts.subtitle ? 78 : 56;
-    const rowH = Math.max(32, Math.min(52, Math.floor((h - 56 - head) / nRows)));
-    const panelW = Math.min(380, w - 36);
+    const safe = safeArea(this);
+    const rowH = Math.max(32, Math.min(52, Math.floor((safe.h - 56 - head) / nRows)));
+    const panelW = Math.min(380, safe.w - 36);
     const panelH = head + nRows * rowH + 12;
-    const px = Math.round(w / 2), py = Math.round(h / 2);
+    const px = Math.round(safe.cx), py = Math.round(safe.cy);
     const top = py - panelH / 2;
 
     const panel = this.add.rectangle(px, py, panelW, panelH, 0x2b1d11, 0.98)
@@ -5531,10 +5591,11 @@ class PrairieScene extends Phaser.Scene {
 
     const rows = SEEDS.length + 1;
     const head = 78;
-    const rowH = Math.max(34, Math.min(50, Math.floor((h - 60 - head) / rows)));
-    const panelW = Math.min(340, w - 36);
+    const safe = safeArea(this);
+    const rowH = Math.max(34, Math.min(50, Math.floor((safe.h - 60 - head) / rows)));
+    const panelW = Math.min(340, safe.w - 36);
     const panelH = head + rows * rowH + 12;
-    const px = Math.round(w / 2), py = Math.round(h / 2);
+    const px = Math.round(safe.cx), py = Math.round(safe.cy);
     const top = py - panelH / 2;
 
     const panel = this.add.rectangle(px, py, panelW, panelH, 0x2b1d11, 0.98)
@@ -6311,4 +6372,12 @@ const game = new Phaser.Game({
   window.addEventListener('orientationchange', () => setTimeout(syncSize, 120));
   window.addEventListener('resize', syncSize);
   window.addEventListener('pageshow', () => setTimeout(syncSize, 60));
+
+  /* When the notch measurements finally arrive (or change, on
+     rotating the phone), re-run every layout so the Plant button,
+     the joystick and the menus move to match. refresh() is what
+     makes the game re-lay-out everything it draws. */
+  window.addEventListener('pv-safe-change', () => {
+    if (game && game.scale) game.scale.refresh();
+  });
 })();

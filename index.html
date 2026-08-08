@@ -18,30 +18,13 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
-  /* ===== TEMPORARY COLOUR TEST — remove after we've diagnosed =====
-     Two loud colours, so one relaunch tells us where the border is
-     actually coming from. Whichever colour you see around the edge
-     is the answer:
-
-       MAGENTA  = the border is outside the web page entirely. iOS is
-                  not letting the page reach the edges of the screen,
-                  so nothing in our CSS can fix it — the fix would be
-                  in the viewport/full-screen settings instead.
-       CYAN     = the border is the notch/home-bar spacing in our own
-                  CSS doing its job. That one is deliberate.
-       NEITHER  = the border is gone.
-
-     To undo: delete these two rules and put `background: #5d8f42`
-     back on `html, body` below. ================================== */
-  html { background: #ff00ff; }
-  body { background: #00ffff; }
-
   html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
+    background: #5d8f42;
     /* stop iOS from scrolling, bouncing, or zooming while you play */
     overscroll-behavior: none;
     touch-action: none;
@@ -51,24 +34,44 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
-  /* Keep the playfield clear of the notch and the home bar.
-     In landscape the notch is on one side, so we inset both.
+  /* The artwork fills the WHOLE screen, corner to corner, and draws
+     underneath the notch and the home bar.
 
-     These MUST be offsets (left/right/bottom), not padding. The game
-     measures this box to decide how big to draw itself, and that
-     measurement counts padding as part of the box — so with padding
-     it drew itself full-window-width but sat it after the notch,
-     hanging the whole right-hand side off the screen. Anything
-     anchored to the right edge (the Plant button) got cut off.
-     As offsets, this box IS the visible play area, so what the game
-     measures and what you can actually see are the same thing. */
+     This used to be inset on three sides to keep the playfield clear
+     of the notch. That worked, but on a notched iPhone in landscape
+     the notch spacing is 62px on EACH side — so it read as a thick
+     border framing the game, which is what we were chasing.
+
+     Now the picture runs edge to edge instead, and the notch is
+     handled where it actually matters: the buttons, joystick, menus
+     and text all keep themselves inside the safe area, so nothing
+     you need to see or tap is ever hidden behind the notch or the
+     home bar. The grass simply carries on underneath it.
+
+     The measurements themselves are read out below and handed to
+     the game as window.PV_SAFE. */
   #game {
     position: absolute;
-    top: 0;
-    left: env(safe-area-inset-left, 0px);
-    right: env(safe-area-inset-right, 0px);
-    bottom: env(safe-area-inset-bottom, 0px);
+    inset: 0;
     box-sizing: border-box;
+  }
+
+  /* An invisible ruler. Its padding is set to the notch/home-bar
+     measurements, which the game then reads off it in plain numbers.
+     CSS is the only thing that can see those measurements, so this
+     is how we get them across to the game. */
+  #safeprobe {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    visibility: hidden;
+    pointer-events: none;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   /* The game canvas must COVER this box exactly, always.
 
@@ -110,7 +113,13 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 24px;
+    /* 24px, plus whatever the notch and home bar need, so the words
+       are never tucked behind the Dynamic Island in portrait. */
+    padding: calc(24px + env(safe-area-inset-top, 0px))
+             calc(24px + env(safe-area-inset-right, 0px))
+             calc(24px + env(safe-area-inset-bottom, 0px))
+             calc(24px + env(safe-area-inset-left, 0px));
+    box-sizing: border-box;
   }
   #rotate .phone {
     width: 64px;
@@ -135,6 +144,58 @@
 </head>
 <body>
 <div id="game"></div>
+<div id="safeprobe"></div>
+
+<script>
+/* Reads the notch / home-bar measurements off the invisible ruler
+   above and leaves them where the game can find them, as
+   window.PV_SAFE = { left, right, top, bottom } in plain numbers.
+
+   The game uses these to keep the Plant button, the joystick, the
+   menus and the message box inside the part of the screen you can
+   actually see and reach — while the artwork itself carries on
+   underneath the notch.
+
+   Re-read whenever the screen changes, and a few times over the
+   first few seconds, because iOS doesn't always report the final
+   numbers the instant a home-screen app launches. */
+(function readSafeArea() {
+  const probe = document.getElementById('safeprobe');
+
+  window.PV_SAFE = { left: 0, right: 0, top: 0, bottom: 0 };
+
+  function read() {
+    if (!probe) return;
+    const cs = getComputedStyle(probe);
+    const n = (v) => { const f = parseFloat(v); return isFinite(f) ? f : 0; };
+    const next = {
+      left: n(cs.paddingLeft),
+      right: n(cs.paddingRight),
+      top: n(cs.paddingTop),
+      bottom: n(cs.paddingBottom)
+    };
+    const was = window.PV_SAFE;
+    const changed = !was || was.left !== next.left || was.right !== next.right ||
+                    was.top !== next.top || was.bottom !== next.bottom;
+    window.PV_SAFE = next;
+
+    /* iOS often doesn't report the real notch measurements until a
+       moment after a home-screen app launches. When they do arrive,
+       the game needs telling, or the buttons would stay where they
+       were first put. This shout is what the game listens for. */
+    if (changed) {
+      window.dispatchEvent(new CustomEvent('pv-safe-change', { detail: next }));
+    }
+  }
+
+  read();
+  window.PV_readSafeArea = read;
+  [60, 150, 300, 600, 1000, 1600, 2400, 3500].forEach((ms) => setTimeout(read, ms));
+  window.addEventListener('resize', read);
+  window.addEventListener('orientationchange', () => setTimeout(read, 120));
+  window.addEventListener('pageshow', () => setTimeout(read, 60));
+})();
+</script>
 
 <div id="rotate">
   <div class="phone"></div>
@@ -191,13 +252,8 @@
     const round = (n) => Math.round(n * 100) / 100;
     const lines = [
       'PRAIRIE VILLAGE — screen check',
-      'BUILD 3   (if this does not say BUILD 3,',
-      '           the iPad is still running old files)',
-      '',
-      'layout viewport vs screen:',
-      '  window  ' + innerWidth + ' x ' + innerHeight,
-      '  screen  ' + Math.round(screen.width) + ' x ' + Math.round(screen.height),
-      '  ratio   ' + devicePixelRatio,
+      'BUILD 4   (if this does not say BUILD 4,',
+      '           the device is still on old files)',
       '',
       'window        ' + innerWidth + ' x ' + innerHeight,
       'screen        ' + screen.width + ' x ' + screen.height,
@@ -216,7 +272,10 @@
       'safe area   L ' + inset('left') + '  R ' + inset('right'),
       '            T ' + inset('top') + '  B ' + inset('bottom'),
       '',
-      'All four GAPs should read 0.'
+      'UI kept inside  ' + JSON.stringify(window.PV_SAFE || {}),
+      '',
+      'All four GAPs should read 0, and the play',
+      'area should now match the window exactly.'
     ];
     panel.textContent = lines.join('\n');
   }
@@ -233,11 +292,6 @@
     if (e.touches && e.touches.length === 3) toggle();
   }, { capture: true, passive: true });
 
-  // TEMPORARY: show itself for 12 seconds every launch, so all you
-  // have to do is open the app and take a screenshot. Delete these
-  // two lines once we're done diagnosing.
-  toggle();
-  setTimeout(() => { if (on) toggle(); }, 12000);
 
   // On a laptop, press D instead.
   window.addEventListener('keydown', (e) => {
@@ -252,6 +306,6 @@
      running last week's game.js forever. Changing this number forces
      it to fetch a fresh copy. Bump it to v=4, v=5 and so on for any
      future update. -->
-<script src="game.js?v=3"></script>
+<script src="game.js?v=4"></script>
 </body>
 </html>
