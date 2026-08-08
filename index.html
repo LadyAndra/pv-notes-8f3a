@@ -53,7 +53,31 @@
     bottom: env(safe-area-inset-bottom, 0px);
     box-sizing: border-box;
   }
-  canvas { display: block; }
+  /* The game canvas must COVER this box exactly, always.
+
+     Phaser sizes the canvas itself by measuring #game once and
+     writing that number onto the canvas. If those two ever drift
+     apart — and on the installed iPad app they did, because the
+     window is still settling into its launch size at the moment
+     Phaser takes its one measurement — Phaser never notices. Its
+     size-watcher only asks "has #game changed since I last looked?",
+     never "does the canvas still match #game?". So a canvas that
+     came out slightly too small stayed slightly too small for the
+     whole session, and the green backdrop showed around it.
+
+     These four lines make that impossible to see: whatever number
+     Phaser writes on the canvas, the canvas is still stretched to
+     fill this box corner to corner. Belt and braces alongside the
+     re-measure in game.js. */
+  #game > canvas {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+  }
 
   /* ---- "Please turn your phone" screen -------------------------
      iPhones don't let a website force itself into landscape, so
@@ -102,6 +126,95 @@
      If it won't rotate, swipe down from the top-right<br>
      and switch off Rotation Lock.</p>
 </div>
+
+<!-- A little readout for checking the screen-size fix on the iPad.
+     Touch the screen with THREE fingers at once to show or hide it.
+     Three fingers never happens in normal play (the joystick and the
+     action button are two), so it can't go off by accident. It draws
+     itself in plain HTML on top of everything and never touches the
+     game, so it's safe to leave in — or delete this whole block once
+     you're happy the border is gone. -->
+<div id="sizecheck"></div>
+<style>
+  #sizecheck {
+    display: none;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.85);
+    color: #d8f0b0;
+    font: 12px/1.5 ui-monospace, Menlo, monospace;
+    padding: 14px 18px;
+    border-radius: 10px;
+    white-space: pre;
+    pointer-events: none;
+  }
+</style>
+<script>
+(function sizeCheck() {
+  const panel = document.getElementById('sizecheck');
+  let on = false;
+
+  function inset(side) {
+    const probe = document.createElement('div');
+    probe.style.cssText =
+      'position:fixed;visibility:hidden;height:env(safe-area-inset-' + side + ',0px)';
+    document.body.appendChild(probe);
+    const v = getComputedStyle(probe).height;
+    probe.remove();
+    return v;
+  }
+
+  function report() {
+    const box = document.getElementById('game').getBoundingClientRect();
+    const c = document.querySelector('#game > canvas');
+    const cr = c ? c.getBoundingClientRect() : null;
+    const round = (n) => Math.round(n * 100) / 100;
+    const lines = [
+      'PRAIRIE VILLAGE — screen check',
+      '',
+      'window        ' + innerWidth + ' x ' + innerHeight,
+      'screen        ' + screen.width + ' x ' + screen.height,
+      'pixel ratio   ' + devicePixelRatio,
+      'home-screen   ' + (navigator.standalone === true ? 'yes (installed app)' : 'no (browser tab)'),
+      '',
+      'play area     ' + round(box.width) + ' x ' + round(box.height),
+      'canvas built  ' + (c ? c.width + ' x ' + c.height : '(none yet)'),
+      'canvas shown  ' + (cr ? round(cr.width) + ' x ' + round(cr.height) : '-'),
+      '',
+      'GAP  left   ' + (cr ? round(cr.x - box.x) : '-'),
+      'GAP  top    ' + (cr ? round(cr.y - box.y) : '-'),
+      'GAP  right  ' + (cr ? round((box.x + box.width) - (cr.x + cr.width)) : '-'),
+      'GAP  bottom ' + (cr ? round((box.y + box.height) - (cr.y + cr.height)) : '-'),
+      '',
+      'safe area   L ' + inset('left') + '  R ' + inset('right'),
+      '            T ' + inset('top') + '  B ' + inset('bottom'),
+      '',
+      'All four GAPs should read 0.'
+    ];
+    panel.textContent = lines.join('\n');
+  }
+
+  let timer = null;
+  function toggle() {
+    on = !on;
+    panel.style.display = on ? 'block' : 'none';
+    clearInterval(timer);
+    if (on) { report(); timer = setInterval(report, 500); }
+  }
+
+  window.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length === 3) toggle();
+  }, { capture: true, passive: true });
+
+  // On a laptop, press D instead.
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'd' || e.key === 'D') toggle();
+  }, true);
+})();
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 <script src="game.js"></script>

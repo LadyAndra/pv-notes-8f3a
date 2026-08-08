@@ -6248,13 +6248,19 @@ class PrairieScene extends Phaser.Scene {
   }
 }
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   backgroundColor: '#4e7d3a',
   scale: {
     mode: Phaser.Scale.RESIZE,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    /* No autoCenter. In this mode the canvas is supposed to be
+       exactly the size of its box, so there is nothing to centre —
+       but if the canvas ever came out even slightly small, centring
+       it split the leftover space evenly around all four sides and
+       turned it into a visible green frame. Without centring, the
+       canvas simply starts at the top-left corner. */
+    autoRound: true
   },
   physics: { default: 'arcade', arcade: { debug: false } },
   render: { pixelArt: true, antialias: false, roundPixels: true },
@@ -6262,3 +6268,47 @@ new Phaser.Game({
   // the game itself when he taps.
   scene: [TitleScene, PrairieScene]
 });
+
+/* ---- Keep the drawing size honest --------------------------------
+
+   Phaser already watches for the play area changing size (turning
+   the iPad round, say). What it does NOT watch for is the canvas
+   itself falling out of step with the play area — and that is
+   exactly what happened on the installed iPad app. The home-screen
+   app is still settling into its final launch size in the first
+   fraction of a second, so Phaser's one measurement was taken a
+   moment too early, and nothing afterwards ever re-checked it.
+
+   This is that missing re-check. It compares the play area with
+   what the canvas was actually built at, and if they have drifted
+   apart by more than a pixel it asks Phaser to measure again. It
+   only speaks up when there is a genuine mismatch, so on a normal
+   launch it does nothing at all and nothing on screen moves.
+
+   It runs a few times over the first few seconds — which is the
+   whole window in which the launch size settles — and then stops
+   and stays out of the way. */
+(function keepCanvasFullSize() {
+  const box = document.getElementById('game');
+
+  function syncSize() {
+    const canvas = game.canvas;
+    if (!box || !canvas) return;
+    const r = box.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    // More than a pixel out in either direction = a real mismatch,
+    // not just a rounded-off fraction.
+    if (Math.abs(r.width - canvas.width) > 1 ||
+        Math.abs(r.height - canvas.height) > 1) {
+      game.scale.refresh();
+    }
+  }
+
+  // The moments when the launch size is most likely to change.
+  [0, 60, 150, 300, 600, 1000, 1600, 2400, 3500].forEach(
+    (ms) => setTimeout(syncSize, ms)
+  );
+  window.addEventListener('orientationchange', () => setTimeout(syncSize, 120));
+  window.addEventListener('resize', syncSize);
+  window.addEventListener('pageshow', () => setTimeout(syncSize, 60));
+})();
