@@ -4947,6 +4947,27 @@ class PrairieScene extends Phaser.Scene {
     this.stickKnob.setVisible(false);
     // hand the keyboard over to the text box
     if (this.input.keyboard) this.input.keyboard.enabled = false;
+    // The `enabled` flag above stops Phaser from acting on key presses,
+    // but it does NOT stop Phaser's separate key-capture behavior: the
+    // createCursorKeys()/addKeys('W,A,S,D') calls in create() captured
+    // SPACE, the arrow keys, SHIFT, and W/A/S/D, which makes Phaser call
+    // preventDefault() on those native keydown events no matter what
+    // `enabled` is set to — silently dropping them before they ever
+    // reach this real <input> element. Release that capture while the
+    // box is open, and restore it when the box closes.
+    const dedicationCapturedKeys = [
+      Phaser.Input.Keyboard.KeyCodes.SPACE,
+      Phaser.Input.Keyboard.KeyCodes.UP,
+      Phaser.Input.Keyboard.KeyCodes.DOWN,
+      Phaser.Input.Keyboard.KeyCodes.LEFT,
+      Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      Phaser.Input.Keyboard.KeyCodes.SHIFT,
+      Phaser.Input.Keyboard.KeyCodes.W,
+      Phaser.Input.Keyboard.KeyCodes.A,
+      Phaser.Input.Keyboard.KeyCodes.S,
+      Phaser.Input.Keyboard.KeyCodes.D
+    ];
+    if (this.input.keyboard) this.input.keyboard.removeCapture(dedicationCapturedKeys);
 
     const font = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -5030,7 +5051,10 @@ class PrairieScene extends Phaser.Scene {
       this.dedicationBox = null;
       this.menuOpen = false;
       this.actionVerbShown = null;
-      if (this.input.keyboard) this.input.keyboard.enabled = true;
+      if (this.input.keyboard) {
+        this.input.keyboard.enabled = true;
+        this.input.keyboard.addCapture(dedicationCapturedKeys);
+      }
     };
     const commit = () => {
       const words = cleanDedication(input.value);
