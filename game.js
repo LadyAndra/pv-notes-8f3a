@@ -2297,6 +2297,32 @@ const SEED_ICON_BEANS = [
   '......KKKK.'
 ];
 
+/* ---- the title picture ------------------------------------
+   The house / tree / Henri vignette, 32 wide. Copied verbatim
+   from APPROVED_SPRITES.md, "GROUP 3 — TITLE SCREEN & UI", and
+   drawn through exactly the same six roles as everything else,
+   so the title screen is lit by whatever time of day it is when
+   he opens the game. */
+const TITLE_SCENE = [
+  '........................KKKK....',
+  '......................KKMLLMK...',
+  '.....................KMLLSLLMK..',
+  '...KKK..............KMLLLMMMDMK.',
+  '...KDK..KKK.........KMLMMLMMDMK.',
+  '...KDK.KLLDK........KMMMMDMDDMK.',
+  '...KDKKLLLDDK.......KKMDMDDDDKK.',
+  '.KLLSLLLLDDDDDDDK....KKDDKDDKK..',
+  '..KLLLLLLMMMMMDK.......KEDMK....',
+  '..KLKEEKMMMMMMDK.......KEDMK....',
+  '..KLKEEKMMKEEKDK.......KEDMK....',
+  '..KLLKKMMMKEEKDK.KK..K.KEDMK....',
+  '..KLMMMMMMKEEKDK.KEEKK.KEDMK....',
+  '..KLMMMMMMKEEKDK.KEEEKKEEDMMK...',
+  '..KKKKKKKKKKKKKK.KK.KKKKKKKKK...',
+  '.KKDDKKKKDKKKKKDDKKKKKDKKKKDDK..',
+  '...KK....KDK......KK....KDK.....'
+];
+
 /* Stamps one small typed drawing across a wider blank grid a
    few times, so a bed reads as a little clump rather than one
    lonely stem. Returns rows in exactly the same format as any
@@ -3183,6 +3209,38 @@ function saveGarden(g) {
   }
 }
 
+/* ---- "has he ever opened this before?" ---------------------
+   The Mayor's letter is a once-ever thing, so it needs one line
+   written down somewhere that survives the app being closed.
+   Written the same way the garden is — a single note in the
+   browser's own long-term memory — but deliberately kept in its
+   OWN line rather than tucked inside the garden save. Two
+   reasons: the garden save gets re-read, re-shaped and version-
+   checked every launch, and nothing about a welcome letter
+   should ever be able to disturb what he's grown; and if a
+   future save version ever has to be dropped, the letter still
+   stays read. */
+const WELCOME_KEY = 'prairie-village-welcome-v1';
+
+function hasSeenWelcome() {
+  try {
+    return window.localStorage.getItem(WELCOME_KEY) === '1';
+  } catch (e) {
+    // If the browser won't let us remember anything at all, treat
+    // the letter as already read rather than showing it forever.
+    return true;
+  }
+}
+
+function markWelcomeSeen() {
+  try {
+    window.localStorage.setItem(WELCOME_KEY, '1');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 
 /* ============================================================
    A MAP AREA
@@ -3492,6 +3550,140 @@ const AREAS = {
 /* ============================================================
    THE GAME
    ============================================================ */
+/* ============================================================
+   THE TITLE SCREEN
+   ------------------------------------------------------------
+   Shown every single launch, before the game itself is built.
+   It is deliberately its own small scene rather than a layer
+   drawn on top of the game: nothing about the world, the save
+   file, the weather or the day count is touched or even loaded
+   until he taps, so this screen cannot possibly affect any of
+   them.
+
+   Everything on it is borrowed, not invented — the approved
+   TITLE_SCENE drawing, colored through the same six roles and
+   the same time-of-day palette as the rest of the game; the
+   same font family and warm cream as the area labels and the
+   action button; and the same fade the game already uses to
+   move between areas.
+   ============================================================ */
+class TitleScene extends Phaser.Scene {
+  constructor() { super('title'); }
+
+  create() {
+    /* The one thing here the existing game had no pattern for: what
+       colour sits BEHIND the picture. The game's own background is
+       grass green, but grass green is only ever seen with grass
+       tiles drawn over it — on a bare title screen the morning and
+       midday palettes are green art on a green field and the house
+       all but disappears. So this borrows the dark warm brown the
+       sign boxes and menus are already made of instead: no new
+       colour invented, warm, and the picture reads at all six times
+       of day. One line to change if you'd rather it were green. */
+    this.cameras.main.setBackgroundColor('#2b1d11');
+    this.cameras.main.roundPixels = true;
+
+    // The picture, drawn once at 1:1 and then scaled up by a
+    // whole number so the pixels stay square and crisp.
+    const pal = computePalette(new Date());
+    const titlePal = { K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L, S: pal.S };
+    const sz = gridSize(TITLE_SCENE);
+    if (this.textures.exists('title_scene')) this.textures.remove('title_scene');
+    const tex = this.textures.createCanvas('title_scene', sz.w, sz.h);
+    const tctx = tex.context || tex.getContext();
+    drawPixels(tctx, TITLE_SCENE, titlePal, 0, 0, 1);
+    tex.refresh();
+
+    this.artSize = sz;
+    this.art = this.add.image(0, 0, 'title_scene').setOrigin(0.5);
+
+    const font = '-apple-system, sans-serif';
+
+    this.titleText = this.add.text(0, 0, 'PRAIRIE VILLAGE', {
+      fontFamily: font, fontSize: '30px', color: '#f6ecd6', align: 'center'
+    }).setOrigin(0.5);
+    this.titleText.setShadow(0, 3, '#000000', 6, false, true);
+
+    this.tapText = this.add.text(0, 0, 'tap to begin', {
+      fontFamily: font, fontSize: '16px', color: '#f6ecd6', align: 'center'
+    }).setOrigin(0.5);
+    this.tapText.setShadow(0, 2, '#000000', 5, false, true);
+
+    // A slow breath in and out, so it reads as "waiting for you"
+    // rather than as a stuck screen. Same alpha tween the area
+    // label already uses, just left running.
+    this.tweens.add({
+      targets: this.tapText,
+      alpha: { from: 0.45, to: 1 },
+      duration: 1100,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut'
+    });
+
+    this.layout();
+
+    /* The screen-size listener lives on the game as a whole, not on
+       this scene, so it would keep firing after the title screen has
+       handed over — and then try to move text objects that no longer
+       exist the first time he turned the phone mid-game. So it's
+       taken back off again when this scene closes. */
+    this.onResize = () => this.layout();
+    this.scale.on('resize', this.onResize);
+    this.events.once('shutdown', () => this.scale.off('resize', this.onResize));
+    this.events.once('destroy', () => this.scale.off('resize', this.onResize));
+
+    this.starting = false;
+    this.input.on('pointerdown', () => this.begin());
+    // a keyboard tap works too, for testing on a laptop
+    this.input.keyboard.on('keydown', () => this.begin());
+
+    this.cameras.main.fadeIn(300, 0, 0, 0);
+  }
+
+  /* Worked out fresh on every resize and rotation — never a
+     fixed coordinate, for the same reason the Plant button
+     isn't one. */
+  layout() {
+    const w = this.scale.width, h = this.scale.height;
+    const sz = this.artSize;
+
+    // biggest whole-number scale that still leaves room for the
+    // two lines of text underneath
+    let s = Math.floor(Math.min((w * 0.62) / sz.w, (h * 0.45) / sz.h));
+    s = Math.max(2, Math.min(10, s));
+    this.art.setScale(s);
+
+    const titleSize = Math.round(Math.max(24, Math.min(40, w * 0.072)));
+    this.titleText.setFontSize(titleSize);
+    this.tapText.setFontSize(Math.round(Math.max(13, Math.min(20, titleSize * 0.54))));
+
+    const artH = sz.h * s;
+    const gapA = Math.round(titleSize * 0.9);   // picture to title
+    const gapB = Math.round(titleSize * 0.55);  // title to "tap to begin"
+    const titleH = this.titleText.height;
+    const tapH = this.tapText.height;
+    const total = artH + gapA + titleH + gapB + tapH;
+
+    let y = Math.round(h / 2 - total / 2);
+    this.art.setPosition(Math.round(w / 2), y + artH / 2);
+    y += artH + gapA;
+    this.titleText.setPosition(Math.round(w / 2), y + titleH / 2);
+    y += titleH + gapB;
+    this.tapText.setPosition(Math.round(w / 2), y + tapH / 2);
+  }
+
+  /* The same fade the game uses to walk between areas. */
+  begin() {
+    if (this.starting) return;
+    this.starting = true;
+    this.cameras.main.fadeOut(150, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('prairie');
+    });
+  }
+}
+
 class PrairieScene extends Phaser.Scene {
   constructor() { super('prairie'); }
 
@@ -3551,6 +3743,9 @@ class PrairieScene extends Phaser.Scene {
       // after itself — closing it here would yank the keyboard away
       // mid-sentence when the phone rotates.
       if (this.menuObjects) this.closeChoiceMenu();
+      // The Mayor's letter is rebuilt at the new size instead of
+      // being closed — see relayoutWelcomeLetter.
+      if (this.welcomeObjects) this.relayoutWelcomeLetter();
       this.layoutControls();
     });
     this.buildWeatherLook();
@@ -3558,6 +3753,17 @@ class PrairieScene extends Phaser.Scene {
 
     // Start at his own back door, more or less.
     this.enterArea('home', 25 * T, 24.5 * T);
+
+    // Coming in off the title screen, which faded out to black.
+    // Same fade back up the game already uses between areas.
+    this.cameras.main.fadeIn(200, 0, 0, 0);
+
+    /* The Mayor's letter. Only ever on the very first launch on
+       this device — hasSeenWelcome() is the one line written down
+       for it, and it isn't marked read until he actually taps it
+       away. Put up before he has control, and it holds control
+       until dismissed. */
+    if (!hasSeenWelcome()) this.showWelcomeLetter();
 
     // If real days went by while the app was closed, say so once.
     if (this.daysAway === 1) {
@@ -5084,6 +5290,119 @@ class PrairieScene extends Phaser.Scene {
     try { input.focus(); } catch (e) {}
   }
 
+  /* ---- the Mayor's letter, once ever -----------------------
+     The same bordered box as the sign reader and the menus —
+     dimmed screen, dark warm panel, tan border, cream text —
+     just holding a short letter instead of a list of buttons.
+     Dismissed with one tap anywhere, like everything else.
+
+     While it's up, menuOpen is true, which is the existing catch
+     that stops the thumb-stick, the action button and update()
+     all at once. It writes down that it's been read only when he
+     taps it away, so a letter he never saw is never lost. */
+  showWelcomeLetter() {
+    if (this.menuOpen) return;
+    this.menuOpen = true;
+    // a beat where it ignores taps, so the tap that dismissed the
+    // title screen can't also dismiss the letter
+    this.menuReadyAt = this.time.now + 350;
+
+    this.player.body.setVelocity(0, 0);
+    this.stickPointerId = null;
+    this.stickVector.set(0, 0);
+    this.stickBase.setVisible(false);
+    this.stickKnob.setVisible(false);
+
+    this.buildWelcomeObjects();
+  }
+
+  buildWelcomeObjects() {
+    const D = 20000;
+    const w = this.scale.width, h = this.scale.height;
+    const font = '-apple-system, sans-serif';
+    const objs = [];
+
+    const veil = this.add.rectangle(w / 2, h / 2, w * 2, h * 2, 0x120c06, 0.74)
+      .setScrollFactor(0).setDepth(D).setInteractive();
+    objs.push(veil);
+
+    const px = Math.round(w / 2), py = Math.round(h / 2);
+    const panelW = Math.min(400, w - 36);
+    const wrapW = panelW - 44;
+    const padY = 22;
+
+    // The letter, exactly as written. Measured first, so the box
+    // is built around the words rather than the words squeezed
+    // into a guessed box.
+    const greeting = this.add.text(0, 0, 'Welcome to Prairie Village, Mike.', {
+      fontFamily: font, fontSize: '18px', color: '#f6ecd6', align: 'center',
+      wordWrap: { width: wrapW }, lineSpacing: 3
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2);
+
+    const body = this.add.text(0, 0,
+      "We're so pleased to have you and your dog Henri on as our new " +
+      "Parks Managers — the town's been hoping for someone who'll " +
+      "really look after it.", {
+        fontFamily: font, fontSize: '15px', color: '#f6ecd6', align: 'center',
+        wordWrap: { width: wrapW }, lineSpacing: 4
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2);
+
+    const sign = this.add.text(0, 0, '— The Mayor', {
+      fontFamily: font, fontSize: '15px', color: '#c9ab82', align: 'center'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2);
+
+    const tap = this.add.text(0, 0, 'tap to continue', {
+      fontFamily: font, fontSize: '12px', color: '#b39468', align: 'center'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 2);
+
+    const gap1 = 14, gap2 = 16, gap3 = 18;
+    const contentH = greeting.height + gap1 + body.height + gap2 +
+                     sign.height + gap3 + tap.height;
+    const panelH = Math.min(h - 24, contentH + padY * 2);
+
+    const panel = this.add.rectangle(px, py, panelW, panelH, 0x2b1d11, 0.98)
+      .setScrollFactor(0).setDepth(D + 1);
+    panel.setStrokeStyle(3, 0xcb9f63, 0.95);
+    objs.push(panel);
+
+    let y = Math.round(py - contentH / 2);
+    greeting.setPosition(px, y + greeting.height / 2);
+    y += greeting.height + gap1;
+    body.setPosition(px, y + body.height / 2);
+    y += body.height + gap2;
+    sign.setPosition(px, y + sign.height / 2);
+    y += sign.height + gap3;
+    tap.setPosition(px, y + tap.height / 2);
+
+    objs.push(greeting, body, sign, tap);
+
+    veil.on('pointerdown', () => {
+      if (this.time.now < this.menuReadyAt) return;
+      this.closeWelcomeLetter();
+    });
+
+    this.welcomeObjects = objs;
+  }
+
+  closeWelcomeLetter() {
+    if (!this.welcomeObjects) return;
+    markWelcomeSeen();               // read — and never shown again
+    this.menuOpen = false;
+    this.welcomeObjects.forEach(o => o.destroy());
+    this.welcomeObjects = null;
+    this.actionVerbShown = null;
+  }
+
+  /* If the phone is turned while the letter is up, it is rebuilt
+     at the new size rather than thrown away — turning the phone
+     shouldn't cost him the one showing it ever gets. */
+  relayoutWelcomeLetter() {
+    if (!this.welcomeObjects) return;
+    this.welcomeObjects.forEach(o => o.destroy());
+    this.welcomeObjects = null;
+    this.buildWelcomeObjects();
+  }
+
   /* ---- a plain list of choices over a dimmed screen ---------
      The same look as the seed list, but general enough to serve
      the species list, the "dedicate this?" question, and reading
@@ -5939,5 +6258,7 @@ new Phaser.Game({
   },
   physics: { default: 'arcade', arcade: { debug: false } },
   render: { pixelArt: true, antialias: false, roundPixels: true },
-  scene: [PrairieScene]
+  // The title screen runs first, every launch; it hands over to
+  // the game itself when he taps.
+  scene: [TitleScene, PrairieScene]
 });
