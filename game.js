@@ -382,202 +382,186 @@ function heroFrames() {
 /* ============================================================
    HENRI
    ------------------------------------------------------------
-   Small, white coat, black ears, one black eye-patch marking —
-   drawn with round shapes rather than typed-out pixels (the same
-   trick the trees use), since a dog's silhouette is simple blobs:
-   a body, a head, two ears, a tail. Three poses — down, up, left
-   (right is just "left" mirrored by Phaser at render time, so
-   there's no separate drawing to keep in sync) — each with two
-   walking frames (a little hop) and one sitting frame.
+   Replaced Aug 8. The old system was six hand-drawn 26x20 grids
+   (a walking pair + a sitting frame for each of three facings).
+   This is the finished art, and it is ONE drawing: him sitting,
+   turned three-quarters, traced from real reference via the
+   embroidery-pattern method written up in Henri_Character_Guide.md.
 
-   Resolved Aug 2, REVERSED Aug 6: he was briefly colored straight
-   from the active six-role palette, the same as grass and trees —
-   Andra's playtest found this meant his coat and the rabbits'
-   fur were landing on the same greens as the lawn, so both were
-   hard to track in motion. He's back to his own fixed white coat
-   / black markings (HENRI_COLORS below), nudged only a quarter of
-   the way toward whatever light is active — the same trick the
-   flowers use to stay their own true color while still going
-   quiet at dusk with everything else. Outline (K) still comes
-   from the shared palette, same as every other sprite, so he
-   still belongs to the same "storybook" as the rest of the world.
+   ONE POSE FOR ALL FOUR DIRECTIONS — decided Aug 8 after seeing it
+   running. A front-facing drawing was made too (HENRI_FRONT, kept
+   in henri_FINAL_handoff.js) and briefly used for up/down, but it
+   didn't read well in motion, so it's out. He now stays in the
+   three-quarter view no matter which way he's travelling, which is
+   ordinary for companion animals in this kind of game and reads as
+   style rather than as missing art. Phaser flips the one drawing
+   for the other direction, so there's no mirrored copy to keep in
+   sync. Walking north or south he simply keeps whichever side he
+   was already facing — he only ever turns when he actually moves
+   sideways, so he never flickers mid-trot.
 
-   Also enlarged Aug 6 (CRITTER_SCALE): he and the rabbits were
-   both being drawn at their native, unscaled pixel size while
-   everything else in the game (him, the houses, the trees) is
-   baked in at 3x. Same trick as the hero sprite — the scale is
-   baked into the texture at build time, not applied afterward. */
-const HENRI_W = 26, HENRI_H = 20;
+   THE GRID IS MIRRORED BEFORE USE. The embroidery-pattern tool
+   handed back a flipped image, which put his eye patch over his
+   LEFT eye. In life it's his RIGHT eye — the viewer's left when he
+   looks at you (Henri_Character_Guide.md, and the art this
+   replaced had it that way too). Flipping happens in code, just
+   below, rather than by retyping the grid, so what's typed out
+   here still matches henri_FINAL_handoff.js line for line and the
+   two can be diffed. Flipping a drawing also turns the dog around,
+   which is why the art ends up natively facing RIGHT.
+
+   No walk cycle. There are no legs-mid-stride frames anywhere in
+   here — while he's moving, the drawing is simply lifted a couple
+   of pixels on a timer and dropped again, which is the same little
+   hop the old code already did. Standing still = not lifted.
+
+   Colors: K (outline) comes from the shared world palette like
+   every other sprite, so he sits in the same storybook as the
+   grass and houses. W/w/B/G/P are his own true coloring — cream
+   coat, near-black ears/patch/tail — nudged only a quarter of the
+   way toward the ambient light, so he goes quiet at dusk with
+   everything else without ever camouflaging into the lawn. Same
+   reasoning as before, just a new set of letters.
+
+   SIZING — one dial, HENRI_TARGET_H: how tall he stands on screen
+   in pixels. Everything else is worked out from it. CRITTER_SCALE
+   is deliberately left out of it, since the rabbits share that.
+   ============================================================ */
 const CRITTER_SCALE = 2;
-const HENRI_COLORS = { L: '#f4ecd8', M: '#d8c8a6', D: '#241f1a', E: '#171310' };
-
-/* Henri, redrawn Aug 3 as hand-pixel letter grids — the same
-   treatment as every other living thing in the game. He'd been the
-   one creature still drawn by code as smooth ovals, which is why he
-   looked soft next to the hand-drawn trees. Six poses; walking
-   bounce is the whole drawing lifted one pixel. Same letters as
-   the trees: K outline, L coat, M coat shading (kept away from the
-   silhouette edge so he can't melt into M-based grass), D for his
-   black ears, eye patch and nose, E for the shadow under him. */
-const HENRI_LEFT = [
-  '..........................',
-  '..........................',
-  '....KKKK..................',
-  '...KLLLLKKK...............',
-  '..KLDDLLLDDK..............',
-  '..KLDDLLLDDDK.........KK..',
-  '.KDLLLLLLLDDK........KLLK.',
-  '.KDLLLLLLLDDK........KLLK.',
-  '..KLLLLLLLLDK.......KLLK..',
-  '..KKLLLLLLLLKKKKKKKKLLLK..',
-  '...KLLLLLLLLLLLLLLLLLLLK..',
-  '...KKLLLLLLLLLLLLLMMLLK...',
-  '....KLLLLLLLLLLLMMMLLK....',
-  '....KKLLLLLLLLLMMMLLKK....',
-  '.....KLLEELLLLLEELLLK.....',
-  '.....KKKLLKKKKKKLLKKK.....',
-  '.......KLLK....KLLK.......',
-  '.......KLLK....KLLK.......',
-  '.......KLLK....KLLK.......',
-  '.......KKKK....KKKK.......'
-];
-
-const HENRI_LEFT_SIT = [
-  '..........................',
-  '..........................',
-  '.....KKKK.................',
-  '....KLLLLKKK..............',
-  '...KLDDLLLDDK.............',
-  '...KLDDLLLDDDK............',
-  '..KDLLLLLLLDDK............',
-  '..KDLLLLLLLDDK............',
-  '...KLLLLLLLLDK............',
-  '....KKLLLLLLKKK...........',
-  '.....KLLLLLLLLKK..........',
-  '.....KLLLLLLLLLLK.........',
-  '.....KLLLLLLLLLLLK........',
-  '.....KLLLLLLLLLLLLK.......',
-  '.....KLLLKLLLLLMMLKK......',
-  '.....KLLLKLLLLLLMLLKKK....',
-  '.....KLLLKLLLLLLLLLKLLK...',
-  '.....KLLLKKELLLLELKKLLK...',
-  '.....KKKKKKKLLLLLKKKKKK...',
-  '...........KKKKKK.........'
-];
-
-const HENRI_DOWN = [
-  '..........................',
-  '..........................',
-  '........KKKKKK............',
-  '......KKLLLLLLKK..........',
-  '.....KDLLLLLLLLDK.........',
-  '....KDDLLDDLLLLDDK........',
-  '....KDDLLDDLLLLDDK........',
-  '....KDDLLLLLLLLDDK........',
-  '.....KKLLLLLLLLKK.........',
-  '......KLLLDDLLLK..........',
-  '.....KKLLLLLLLLKK.........',
-  '....KKLLLLLLLLLLKK........',
-  '....KLLLLLLLLLLLLKK.......',
-  '....KLLLLLLLLLLMLLK.......',
-  '....KLLLLLLLLLMMLLK.......',
-  '.....KLLLLLLLLMLLK........',
-  '.....KKLLKKKKLLKKK........',
-  '......KLLK..KLLK..........',
-  '......KLLK..KLLK..........',
-  '......KKKK..KKKK..........'
-];
-
-const HENRI_DOWN_SIT = [
-  '..........................',
-  '..........................',
-  '..........................',
-  '........KKKKKK............',
-  '......KKLLLLLLKK..........',
-  '.....KDLLLLLLLLDK.........',
-  '....KDDLLDDLLLLDDK........',
-  '....KDDLLDDLLLLDDK........',
-  '....KDDLLLLLLLLDDK........',
-  '.....KKLLLLLLLLKK.........',
-  '......KLLLDDLLLK..........',
-  '.....KKLLLLLLLLKK.........',
-  '....KKLLLLLLLLLLKK........',
-  '...KKLLLLLLLLLLLLKK.......',
-  '...KLLLLLLLLLLLLMLK.......',
-  '...KLLLLLLLLLLLMMLLK......',
-  '...KKLLKKLLLLKKLLKKK......',
-  '.....KKKKLLLLKKKK.........',
-  '........KKKKKK............',
-  '..........................'
-];
-
-const HENRI_UP = [
-  '..........................',
-  '..........................',
-  '........KKKKKK............',
-  '......KKLLLLLLKK..........',
-  '.....KDLLLLLLLLDK.........',
-  '....KDDLLLLLLLLDDK........',
-  '....KDDLLLLLLLLDDK........',
-  '....KDDLLLLLLLLDDK........',
-  '.....KKLLLLLLLLKK.........',
-  '......KLLLLLLLLK..........',
-  '.....KKLLLLLLLLKK.........',
-  '....KKLLLLLLLLLLKK........',
-  '....KLLLLKMMKLLLLKK.......',
-  '....KLLLLKMMKLLLMLK.......',
-  '....KLLLLLKKLLLLLLK.......',
-  '.....KLLLLLLLLMLLK........',
-  '.....KKLLKKKKLLKKK........',
-  '......KLLK..KLLK..........',
-  '......KLLK..KLLK..........',
-  '......KKKK..KKKK..........'
-];
-
-const HENRI_UP_SIT = [
-  '..........................',
-  '..........................',
-  '..........................',
-  '........KKKKKK............',
-  '......KKLLLLLLKK..........',
-  '.....KDLLLLLLLLDK.........',
-  '....KDDLLLLLLLLDDK........',
-  '....KDDLLLLLLLLDDK........',
-  '....KDDLLLLLLLLDDK........',
-  '.....KKLLLLLLLLKK.........',
-  '.....KKLLLLLLLLKK.........',
-  '....KKLLLLLLLLLLKK........',
-  '...KKLLLLKMMKLLLLKK.......',
-  '...KLLLLLKMMKLLLLLKK......',
-  '...KLLLLLLKKLLLLLMLK......',
-  '...KKLLLLLLLLLLLLLLK......',
-  '.....KKKKKKKKKKKKKK.......',
-  '..........................',
-  '..........................',
-  '..........................'
-];
-
-const HENRI_GRIDS = {
-  left: HENRI_LEFT, leftSit: HENRI_LEFT_SIT,
-  down: HENRI_DOWN, downSit: HENRI_DOWN_SIT,
-  up: HENRI_UP, upSit: HENRI_UP_SIT
+const HENRI_COLORS = {
+  W: '#faf2e3',   // cream/white coat
+  w: '#e4d6be',   // soft cream shading (chest band, flank, paw volume)
+  B: '#2a2218',   // near-black — ears, eye patch, tail (his real markings)
+  G: '#5a4e40',   // lighter charcoal accent within the black areas
+  P: '#f4b7c2'    // pink blush
 };
 
-function drawHenri(ctx, dir, sit, bounce, pal, scale) {
-  scale = scale || 1;
-  const rows = HENRI_GRIDS[dir + (sit ? 'Sit' : '')];
+/* ---- THREE-QUARTER — sitting, turned. His only drawing; used
+   for every direction, flipped for the other side. Identical to
+   the approved art except that the four entirely-blank rows the
+   pattern tool left around it (two above, two below) are trimmed
+   off, so his feet land exactly on the bottom edge of the frame
+   and the hop lifts cleanly from there. ---- */
+const HENRI_THREEQUARTER = [
+  '........KKKKKKKK..............',
+  '......KKWWWWWWWWKKK...........',
+  '.....KBWWWWWWWBWKBBK..........',
+  '....KGWWWWWWWBBBWBBBK.........',
+  '...KBBWWWWWWBBBBWBBBGK........',
+  '...KBWWWWWWWBBBBBWGBBBK.......',
+  '...KBWWBBWWWBBGBBWBBBBK.......',
+  '...KBWWBKWWWBKBBBWBBBBK.......',
+  '...KBBPPKWKKWKPPBWBBBBK.......',
+  '...KBBWWWWWWWWWWWWBBBBK..K....',
+  '....KBWWWWWWWWWWWWWBKK..KWK...',
+  '.....KKWWWWWWWWWWWKKK...KWWK..',
+  '......KKWBBBBBWWKBBBK..KWWK...',
+  '......KBWWWWWWWBBBBBBKKWWWK...',
+  '......KWWWWWWWWWWBBBWKKWWBK...',
+  '......KWWKWWKWWWWWWWWKBWBK....',
+  '......KWWWKWKWWWWWWWWKBBKK....',
+  '......KWWWWKKWWWWKWWWWKK......',
+  '.....KKWWWWWKWWWKGWWWK........',
+  '.....KGGGGBKGGGGKGGGGK........',
+  '......KKKKKKKKKKKKKKK.........'
+];
+
+/* ---- HOW BIG HE IS. The one dial. -------------------------------
+   How tall Henri stands on screen, in pixels. For reference: Mike
+   is 87, a map square is 48, and the Henri this replaced was 38.
+   Turn this number and everything else follows — the sprite sheet
+   resizes, his collision box and shadow re-fit themselves. Nothing
+   else needs touching.
+
+   42 is deliberately 2x his 21-pixel-tall drawing, so every art
+   pixel becomes a tidy 2x2 block and he's as crisp as he can be.
+   Any other number works too (see drawHenriPixels below), it just
+   won't divide as evenly. */
+const HENRI_TARGET_H = 42;
+
+/* Flip the drawing left-to-right — see the note about the eye
+   patch at the top of this section. */
+function mirrorGrid(rows) { return rows.map(r => r.split('').reverse().join('')); }
+
+/* His one pose, mirrored, and the scale that brings it out
+   HENRI_TARGET_H tall. The grid is trimmed to exactly the dog, so
+   rows.length IS his height in art pixels. */
+const HENRI_POSE = {
+  rows: mirrorGrid(HENRI_THREEQUARTER),
+  scale: HENRI_TARGET_H / HENRI_THREEQUARTER.length
+};
+
+// how far the hop lifts him, in screen pixels
+const HENRI_HOP = 2;
+
+/* The frame he's drawn into: wide enough for the drawing, tall
+   enough for him plus the hop's worth of headroom so lifting him
+   doesn't crop his ears off. He stands on the bottom edge. */
+const HENRI_FRAME_W = Math.round(gridSize(HENRI_POSE.rows).w * HENRI_POSE.scale);
+const HENRI_FRAME_H = HENRI_TARGET_H + HENRI_HOP;
+
+/* Centre him on the dog himself, not on the grid he was typed into
+   — the grid carries blank columns down one side, so centring on
+   the grid would sit him off to one side of the frame. Phaser flips
+   him about the frame's middle when he turns around, and anything
+   off-centre would make him visibly jump sideways at that moment.
+   Worked out once here rather than on every redraw. */
+HENRI_POSE.ox = (() => {
+  let x0 = Infinity, x1 = -Infinity;
+  HENRI_POSE.rows.forEach(row => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '.') continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+    }
+  });
+  return Math.round(HENRI_FRAME_W / 2 - ((x0 + x1 + 1) / 2) * HENRI_POSE.scale);
+})();
+
+/* Stamp out one art pixel as a block of screen pixels.
+
+   drawPixels() (the one everything else in the game uses) assumes a
+   whole-number scale: 2 means every art pixel becomes a tidy 2x2
+   block. At the current HENRI_TARGET_H that's exactly what happens
+   here too. This version exists so that isn't a requirement: it
+   works out where each art pixel's edges land and fills the gap
+   between them, so at an in-between size the blocks come out 1 or 2
+   screen pixels wide but still butt up against each other exactly,
+   with no seams or overlap. That means he stays crisp pixel art at
+   any height, not just at clean multiples — so HENRI_TARGET_H above
+   can be set to whatever actually looks right on screen. */
+function drawHenriPixels(ctx, rows, palette, ox, oy, scale) {
+  for (let y = 0; y < rows.length; y++) {
+    const y0 = oy + Math.round(y * scale), y1 = oy + Math.round((y + 1) * scale);
+    const row = rows[y];
+    for (let x = 0; x < row.length; x++) {
+      const c = palette[row[x]];
+      if (!c) continue;
+      const x0 = ox + Math.round(x * scale), x1 = ox + Math.round((x + 1) * scale);
+      ctx.fillStyle = c;
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    }
+  }
+}
+
+/* Draw him into a frame-sized canvas. `bounce` is the whole hop:
+   true lifts the entire drawing, false plants it back down. That
+   single flag, flipped on a timer, is the only "animation" he has. */
+function drawHenri(ctx, bounce, pal) {
+  const s = HENRI_POSE.scale;
   // his own true colors, only nudged a quarter of the way toward
   // the ambient light — see the note above
   const lit = hex => blendHex(hex, pal.M, 0.25);
   const hp = {
     K: pal.K,
-    E: lit(HENRI_COLORS.E),
-    D: lit(HENRI_COLORS.D),
-    M: lit(HENRI_COLORS.M),
-    L: lit(HENRI_COLORS.L)
+    W: lit(HENRI_COLORS.W),
+    w: lit(HENRI_COLORS.w),
+    B: lit(HENRI_COLORS.B),
+    G: lit(HENRI_COLORS.G),
+    P: lit(HENRI_COLORS.P)
   };
-  // the trot hop: the whole drawing lifts, scaled the same as everything else
-  drawPixels(ctx, rows, hp, 0, bounce ? -scale : 0, scale);
+  const oy = HENRI_FRAME_H - HENRI_TARGET_H - (bounce ? HENRI_HOP : 0);
+  drawHenriPixels(ctx, HENRI_POSE.rows, hp, HENRI_POSE.ox, oy, s);
 }
 
 /* ============================================================
@@ -2211,6 +2195,33 @@ const UI_WATERING_CAN = [
   '..KKKKKKKKKK......'
 ];
 
+/* The shovel on the Plant button. Approved Aug 8, replacing the
+   words "Plant a Tree" — the text ran off the right-hand edge of a
+   phone, and a picture says it faster anyway. Same six roles as the
+   watering can and the seed pouch above, so it goes quiet at dusk
+   with the rest of the world. D-grip at the top, then the shaft,
+   then a spade blade with foot-shoulders tapering to a point. Light
+   from the upper-left, like everything else. */
+const UI_SHOVEL = [
+  '..KKKKKKK..',
+  '.KKMMMDDKK.',
+  '.KMKKKKKDK.',
+  '.KMK...KDK.',
+  '.KMK...KDK.',
+  '.KMKKKKKDK.',
+  '.KKMMMDDKK.',
+  '...KMMDK...',
+  '...KMMDK...',
+  '..KKMMDKK..',
+  '.KDLLLLLDK.',
+  'KLSLLLLLLMK',
+  'KLLLLLLLMMK',
+  'KLLLLLLLMMK',
+  '.KLLLLLMMK.',
+  '..KLLLMMK..',
+  '...KKKKK...'
+];
+
 const UI_SEED_POUCH = [
   '....KK.KK.....',
   '....KLKDK.....',
@@ -2687,6 +2698,16 @@ const TUNING = {
   stickMaxRadius: 58,
   stickDeadZone: 8
 };
+
+/* How far the Plant button keeps back from the edges of the play
+   area. One number, used for both the gap from the right edge and
+   the gap from the top, so the corner always looks even. */
+const PLANT_BTN_MARGIN = 16;
+
+/* The Plant button is a square now that it holds a drawn shovel
+   instead of the words "Plant a Tree". 64 is comfortably bigger
+   than the 44 Apple asks for as a minimum tap target. */
+const PLANT_BTN_SIZE = 64;
 
 /* The art is drawn at 16 pixels to a square, then shown 3x bigger
    so it's comfortable on an iPad. So one square of the map is 48
@@ -3749,7 +3770,8 @@ class PrairieScene extends Phaser.Scene {
        same six roles as everything else, so they sit down at dusk
        with the rest of the world. */
     const uiPal = { K: pal.K, E: pal.E, D: pal.D, M: pal.M, L: pal.L, S: pal.S };
-    [['ui_wateringcan', UI_WATERING_CAN], ['ui_seedpouch', UI_SEED_POUCH]]
+    [['ui_wateringcan', UI_WATERING_CAN], ['ui_seedpouch', UI_SEED_POUCH],
+     ['ui_shovel', UI_SHOVEL]]
       .forEach(([key, rows]) => {
         const g = gridSize(rows);
         this.makeTexture(key, g.w, g.h, c => drawPixels(c, rows, uiPal));
@@ -3809,44 +3831,41 @@ class PrairieScene extends Phaser.Scene {
     this.makeTexture('plaque', qsz.w, qsz.h, c => drawPixels(c, T_PLAQUE, treePal));
   }
 
-  /* Henri gets his own small spritesheet: 9 frames (3 directions x
-     2 walk frames + 1 sit frame each). Each frame is drawn and
-     outlined on its own little canvas first, then stamped into the
-     sheet — outlining the whole sheet at once would smear a line
-     across the gap between frames. */
+  /* Henri's spritesheet — the whole thing is three frames now, off
+     one drawing: settled, hopped, and sitting (which is the settled
+     one again, named separately so the following code reads clearly).
+     Every direction uses these; Phaser flips them for the other side.
+     The "walk" animation is just settled/hopped alternating — no
+     legs-mid-stride art exists anywhere.
+
+     Each frame is drawn on its own little canvas first, then stamped
+     into the sheet — drawing straight into the sheet would let one
+     frame's hop bleed into its neighbour. */
   buildHenriArt(pal) {
-    // Baked in at CRITTER_SCALE, same as the hero sprite — see the
-    // note above HENRI_W.
-    const HW = HENRI_W * CRITTER_SCALE, HH = HENRI_H * CRITTER_SCALE;
-    const specs = [
-      ['down0', 'down', false, false], ['down1', 'down', false, true], ['downSit', 'down', true, false],
-      ['up0', 'up', false, false], ['up1', 'up', false, true], ['upSit', 'up', true, false],
-      ['left0', 'left', false, false], ['left1', 'left', false, true], ['leftSit', 'left', true, false]
-    ];
+    const HW = HENRI_FRAME_W, HH = HENRI_FRAME_H;
+    const specs = [['side0', false], ['side1', true], ['sideSit', false]];
     if (this.textures.exists('henri')) this.textures.remove('henri');
     const tex = this.textures.createCanvas('henri', specs.length * HW, HH);
     const ctx = tex.context || tex.getContext();
     specs.forEach((s, i) => {
-      // The grids carry their own K outline, so no outline pass here —
+      // The grid carries its own K outline, so no outline pass here —
       // running one would fatten his line to two pixels.
       const frame = document.createElement('canvas');
       frame.width = HW; frame.height = HH;
-      drawHenri(frame.getContext('2d'), s[1], s[2], s[3], pal, CRITTER_SCALE);
+      drawHenri(frame.getContext('2d'), s[1], pal);
       ctx.drawImage(frame, i * HW, 0);
     });
     tex.refresh();
     specs.forEach((s, i) => tex.add(s[0], 0, i * HW, 0, HW, HH));
 
-    ['down', 'up', 'left'].forEach(dir => {
-      const key = 'henri-walk-' + dir;
-      if (this.anims.exists(key)) return;
+    if (!this.anims.exists('henri-walk')) {
       this.anims.create({
-        key,
-        frames: [dir + '0', dir + '1'].map(f => ({ key: 'henri', frame: f })),
+        key: 'henri-walk',
+        frames: ['side0', 'side1'].map(f => ({ key: 'henri', frame: f })),
         frameRate: 6,
         repeat: -1
       });
-    });
+    }
   }
 
   /* Stage 5 — the rabbits. Four static poses (no walk-cycle
@@ -3982,7 +4001,8 @@ class PrairieScene extends Phaser.Scene {
     if (this.henri) {
       this.henri.setPosition(spawnX, spawnY + T * 0.6);
       this.henriState = 'sit';
-      this.henriFacing = 'down';
+      // 'right' is the drawing unflipped — he has no forward-facing pose
+      this.henriFacing = 'right';
     }
 
     this.exitCooldown = 350;
@@ -4027,12 +4047,16 @@ class PrairieScene extends Phaser.Scene {
     // Henri — no physics body of his own. He simply retraces the
     // path his human just walked, which is what keeps him out of
     // fences and trees without needing his own collision checks.
-    this.henriShadow = this.add.ellipse(0, 0, 26 * CRITTER_SCALE, 9 * CRITTER_SCALE, 0x1d2b16, 0.22);
-    this.henri = this.add.sprite(0, 0, 'henri', 'downSit');
+    // sized off HENRI_TARGET_H rather than typed in, so it keeps
+    // fitting him if that dial gets turned
+    this.henriShadow = this.add.ellipse(0, 0,
+      Math.round(HENRI_TARGET_H * 0.8), Math.round(HENRI_TARGET_H * 0.26), 0x1d2b16, 0.22);
+    this.henri = this.add.sprite(0, 0, 'henri', 'sideSit');
     this.henri.setOrigin(0.5, 1);
     this.henriTrail = [];
     this.henriState = 'sit';
-    this.henriFacing = 'down';
+    // 'right' is the drawing unflipped — he has no forward-facing pose
+    this.henriFacing = 'right';
 
     // Stage 5 — the little sitting rabbit that signals "one's about,
     // go tap Henri". Positioned wherever chaseZone() says whenever
@@ -4104,15 +4128,16 @@ class PrairieScene extends Phaser.Scene {
        is context-sensitive, and making it say PLANT every time he
        crosses a patch of grass would fill the game with noise. This
        way, walking around on grass stays exactly as quiet as it is.
-       Plain words for now — a proper hand-drawn icon is a polish
-       job for later, not something to hold the reveal up for. */
-    this.plantBtn = this.add.rectangle(0, 0, 132, 44, 0x2b1d11, 0.72)
+       A drawn shovel rather than the words "Plant a Tree" (Aug 8):
+       the words needed a wide button, and a wide button was the
+       thing running off the edge of a phone. A square one can't. */
+    this.plantBtn = this.add.rectangle(0, 0, PLANT_BTN_SIZE, PLANT_BTN_SIZE,
+      0x2b1d11, 0.72)
       .setOrigin(1, 0).setScrollFactor(0).setDepth(D).setVisible(false);
     this.plantBtn.setStrokeStyle(3, 0xcb9f63, 0.9);
-    this.plantBtnLabel = this.add.text(0, 0, 'Plant a Tree', {
-      fontFamily: '-apple-system, sans-serif', fontSize: '15px',
-      color: '#f6ecd6', align: 'center'
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(D + 1).setVisible(false);
+    this.plantBtnIcon = this.add.image(0, 0, 'ui_shovel')
+      .setOrigin(0.5).setScale(3).setScrollFactor(0)
+      .setDepth(D + 1).setVisible(false);
 
     // Stage 5 — the little banner that shows while the rabbit
     // chase is on: rabbits left, and the clock. Same look as the
@@ -4139,13 +4164,22 @@ class PrairieScene extends Phaser.Scene {
     this.actionVerbShown = null;
     this.readout.setPosition(10, 10);
 
-    /* The Plant button, tucked into the top-right corner. Its
-       bounds are remembered as plain numbers so the tap test can
-       use them directly — see onDown. */
-    const pw = 132, ph = 44, pad = 10;
-    this.plantRect = { x: w - pad - pw, y: pad, w: pw, h: ph };
-    this.plantBtn.setPosition(w - pad, pad);
-    this.plantBtnLabel.setPosition(w - pad - pw / 2, pad + ph / 2);
+    /* The Plant button, tucked into the top-right corner. Anchored
+       to the live right edge of the play area with a 16px margin,
+       worked out fresh every time this runs — and this runs on every
+       resize and rotation. Never a fixed x-coordinate: on a narrow
+       phone a hard number walks straight off the screen. On a screen
+       too narrow to hold the full button it shrinks rather than
+       overhanging. Its bounds are remembered as plain numbers so the
+       tap test can use them directly — see onDown. */
+    const pad = PLANT_BTN_MARGIN;
+    const pw = Math.min(PLANT_BTN_SIZE, Math.max(44, w - pad * 2));
+    const ph = PLANT_BTN_SIZE;
+    const rightEdge = w - pad;
+    this.plantBtn.setSize(pw, ph);
+    this.plantRect = { x: rightEdge - pw, y: pad, w: pw, h: ph };
+    this.plantBtn.setPosition(rightEdge, pad);
+    this.plantBtnIcon.setPosition(rightEdge - pw / 2, pad + ph / 2);
 
     this.areaLabel.setPosition(w * 0.5, 52);
     this.msgText.setPosition(w * 0.5, h - 52);
@@ -4162,7 +4196,7 @@ class PrairieScene extends Phaser.Scene {
   updatePlantButton() {
     const on = !!PLANTABLE_AREAS[this.areaKey] && !this.chaseActive;
     if (this.plantBtn) this.plantBtn.setVisible(on);
-    if (this.plantBtnLabel) this.plantBtnLabel.setVisible(on);
+    if (this.plantBtnIcon) this.plantBtnIcon.setVisible(on);
     this.plantBtnOn = on;
   }
 
@@ -5390,23 +5424,27 @@ class PrairieScene extends Phaser.Scene {
       const step = Math.min(dist, HENRI_SPEED * (delta / 1000));
       this.henri.x += (dx / dist) * step;
       this.henri.y += (dy / dist) * step;
+      // He only has a side-on drawing, so he only ever turns when
+      // he's actually moving sideways — heading straight up or down
+      // he keeps whichever way he was already facing. Left alone he
+      // never flickers mid-trot.
       if (Math.abs(dx) > Math.abs(dy)) this.henriFacing = dx > 0 ? 'right' : 'left';
-      else this.henriFacing = dy > 0 ? 'down' : 'up';
     }
 
     // he only sits once you've actually stopped AND he's caught up —
     // otherwise he'd plop down mid-stride every time the gap closed
     this.henriState = (playerMoving || dist > 6) ? 'walk' : 'sit';
 
-    const dirKey = this.henriFacing === 'right' ? 'left' : this.henriFacing;
-    this.henri.setFlipX(this.henriFacing === 'right');
+    // 'henri-walk' is a two-frame loop of the SAME drawing, one
+    // settled and one lifted — the hop, not a walk cycle. The art
+    // faces right, so it's LEFT that gets flipped over.
+    this.henri.setFlipX(this.henriFacing === 'left');
     if (this.henriState === 'walk') {
-      const anim = 'henri-walk-' + dirKey;
       const cur = this.henri.anims.currentAnim;
-      if (!cur || cur.key !== anim || !this.henri.anims.isPlaying) this.henri.play(anim, true);
+      if (!cur || cur.key !== 'henri-walk' || !this.henri.anims.isPlaying) this.henri.play('henri-walk', true);
     } else {
       this.henri.anims.stop();
-      this.henri.setFrame(dirKey + 'Sit');
+      this.henri.setFrame('sideSit');
     }
 
     this.henri.setDepth(this.henri.y - 2);
@@ -5530,7 +5568,14 @@ class PrairieScene extends Phaser.Scene {
        everything else in the yard already bumps into. */
     if (!this.henri.body) {
       this.physics.add.existing(this.henri);
-      this.henri.body.setSize(28, 14).setOffset(12, 24);
+      // Same little 28x14 box under his feet as always — but its
+      // position is worked out from the frame size rather than typed
+      // in, because his frame got taller with the Aug 8 art swap and
+      // a hard-coded offset would have left it floating at his chest.
+      const bw = 28, bh = 14;
+      this.henri.body
+        .setSize(bw, bh)
+        .setOffset((HENRI_FRAME_W - bw) / 2, HENRI_FRAME_H - bh - 2);
       this.henri.body.setCollideWorldBounds(true);
     }
     this.henriChaseCollider = this.physics.add.collider(this.henri, this.blockers);
@@ -5611,19 +5656,18 @@ class PrairieScene extends Phaser.Scene {
     this.henri.body.setVelocity(dir.x * speed, dir.y * speed);
 
     const moving = dir.x !== 0 || dir.y !== 0;
-    if (moving) {
-      if (Math.abs(dir.x) > Math.abs(dir.y)) this.henriFacing = dir.x > 0 ? 'right' : 'left';
-      else this.henriFacing = dir.y > 0 ? 'down' : 'up';
+    // only turns on sideways movement, same as when he's following —
+    // see the note in updateHenri
+    if (moving && Math.abs(dir.x) > Math.abs(dir.y)) {
+      this.henriFacing = dir.x > 0 ? 'right' : 'left';
     }
-    const dirKey = this.henriFacing === 'right' ? 'left' : this.henriFacing;
-    this.henri.setFlipX(this.henriFacing === 'right');
+    this.henri.setFlipX(this.henriFacing === 'left');
     if (moving) {
-      const anim = 'henri-walk-' + dirKey;
       const cur = this.henri.anims.currentAnim;
-      if (!cur || cur.key !== anim || !this.henri.anims.isPlaying) this.henri.play(anim, true);
+      if (!cur || cur.key !== 'henri-walk' || !this.henri.anims.isPlaying) this.henri.play('henri-walk', true);
     } else {
       this.henri.anims.stop();
-      this.henri.setFrame(dirKey + 'Sit');
+      this.henri.setFrame('sideSit');
     }
 
     // Hard stop at the house-avoidance line — see the long note on

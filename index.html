@@ -35,13 +35,22 @@
   }
 
   /* Keep the playfield clear of the notch and the home bar.
-     In landscape the notch is on one side, so we inset both. */
+     In landscape the notch is on one side, so we inset both.
+
+     These MUST be offsets (left/right/bottom), not padding. The game
+     measures this box to decide how big to draw itself, and that
+     measurement counts padding as part of the box — so with padding
+     it drew itself full-window-width but sat it after the notch,
+     hanging the whole right-hand side off the screen. Anything
+     anchored to the right edge (the Plant button) got cut off.
+     As offsets, this box IS the visible play area, so what the game
+     measures and what you can actually see are the same thing. */
   #game {
     position: absolute;
-    inset: 0;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
+    top: 0;
+    left: env(safe-area-inset-left, 0px);
+    right: env(safe-area-inset-right, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
     box-sizing: border-box;
   }
   canvas { display: block; }
