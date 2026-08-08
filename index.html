@@ -18,13 +18,30 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 
 <style>
+  /* ===== TEMPORARY COLOUR TEST — remove after we've diagnosed =====
+     Two loud colours, so one relaunch tells us where the border is
+     actually coming from. Whichever colour you see around the edge
+     is the answer:
+
+       MAGENTA  = the border is outside the web page entirely. iOS is
+                  not letting the page reach the edges of the screen,
+                  so nothing in our CSS can fix it — the fix would be
+                  in the viewport/full-screen settings instead.
+       CYAN     = the border is the notch/home-bar spacing in our own
+                  CSS doing its job. That one is deliberate.
+       NEITHER  = the border is gone.
+
+     To undo: delete these two rules and put `background: #5d8f42`
+     back on `html, body` below. ================================== */
+  html { background: #ff00ff; }
+  body { background: #00ffff; }
+
   html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #5d8f42;
     /* stop iOS from scrolling, bouncing, or zooming while you play */
     overscroll-behavior: none;
     touch-action: none;
@@ -174,6 +191,13 @@
     const round = (n) => Math.round(n * 100) / 100;
     const lines = [
       'PRAIRIE VILLAGE — screen check',
+      'BUILD 3   (if this does not say BUILD 3,',
+      '           the iPad is still running old files)',
+      '',
+      'layout viewport vs screen:',
+      '  window  ' + innerWidth + ' x ' + innerHeight,
+      '  screen  ' + Math.round(screen.width) + ' x ' + Math.round(screen.height),
+      '  ratio   ' + devicePixelRatio,
       '',
       'window        ' + innerWidth + ' x ' + innerHeight,
       'screen        ' + screen.width + ' x ' + screen.height,
@@ -209,6 +233,12 @@
     if (e.touches && e.touches.length === 3) toggle();
   }, { capture: true, passive: true });
 
+  // TEMPORARY: show itself for 12 seconds every launch, so all you
+  // have to do is open the app and take a screenshot. Delete these
+  // two lines once we're done diagnosing.
+  toggle();
+  setTimeout(() => { if (on) toggle(); }, 12000);
+
   // On a laptop, press D instead.
   window.addEventListener('keydown', (e) => {
     if (e.key === 'd' || e.key === 'D') toggle();
@@ -217,6 +247,11 @@
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-<script src="game.js"></script>
+<!-- The ?v=3 is a cache-buster. iOS clings hard to files it has
+     already downloaded for a home-screen app, and will happily keep
+     running last week's game.js forever. Changing this number forces
+     it to fetch a fresh copy. Bump it to v=4, v=5 and so on for any
+     future update. -->
+<script src="game.js?v=3"></script>
 </body>
 </html>
