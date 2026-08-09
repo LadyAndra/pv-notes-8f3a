@@ -989,6 +989,34 @@ const BUSH_ROWS = [
   '.....KKKKKKKKKK'
 ];
 
+/* ---- A WEED ------------------------------------------------
+   16 x 16, and mostly empty on purpose — a weed is a small
+   scruffy thing sitting low on the lawn, not another bush. It's
+   typed in a single letter, K, so that it draws in one flat
+   colour taken from the live time-of-day palette (see the 'weed'
+   texture in buildArt) rather than a hardcoded black. That's why
+   it goes dark green at midday and violet-grey at dawn along
+   with everything else, instead of sitting on the grass like a
+   sticker. */
+const WEED_A = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '......KKK.......',
+  '.....K...K......',
+  '.....K.K.K......',
+  '......KKK.......',
+  '.......K........',
+  '.......K........',
+  '.......K........',
+  '.......K........',
+  '....KK.K.KK.....',
+  '.....KKKKK......'
+];
+
 /* 16x16, tiles seamlessly — repeats as a hedge boundary. */
 const HEDGE_ROWS = [
   'MLLLMMDMLLLMMDML',
@@ -3019,6 +3047,69 @@ function prettyDay(key) {
   return Number(p[2]) + ' ' + MONTHS[Number(p[1]) - 1] + ' ' + p[0];
 }
 
+/* ============================================================
+   STAGE 4 — THE WEEDS
+   ------------------------------------------------------------
+   A parks manager's smallest and most constant job. Two or three
+   turn up on the open turf every morning, anywhere he hasn't
+   built anything, and he pulls them by walking over and tapping
+   the same button he waters with. That's the whole mechanic.
+
+   Deliberately kind: a weed never spreads, never damages a bed
+   or a tree, and never punishes him for leaving it. If he's away
+   a fortnight he comes back to a scruffy lawn and nothing worse.
+   It's there to give him a reason to walk the map each morning,
+   not to make a chore he can fall behind on.
+
+   They reuse the tree rules wholesale — the same "is this plain
+   turf, is anything already standing here" tests — but skip the
+   canopy and doorway clearances. A weed is a few inches across;
+   it doesn't need a tree's elbow room.
+   ============================================================ */
+
+/* How many appear each morning, per area. */
+const WEEDS_PER_DAY = [2, 3];
+
+/* Ground and areas a weed can turn up on — exactly the same turf
+   and the same two places he's allowed to plant a tree. The
+   street is left out for the same reason: it isn't his. */
+const WEED_GROUND = PLANTABLE_GROUND;
+const WEED_AREAS = PLANTABLE_AREAS;
+
+/* Its footprint on the ground in screen pixels — just the little
+   rosette at its base, used for the "is anything already standing
+   here" test. Nothing collides with a weed; he walks straight
+   over it, which is why there's no solid box anywhere below. */
+const WEED_BLOCK = [12, 10];
+
+/* The one clearance a weed does keep: a small gap from a trunk or
+   from another weed, so one never sprouts inside his sapling's
+   ring of earth or lands on top of yesterday's. Much smaller than
+   TREE_CANOPY on purpose. */
+const WEED_CLEAR = 30;
+
+/* How close he has to stand for the button to read PULL. A little
+   tighter than a tree's reach, because a weed is a smaller thing
+   to be "at". */
+const WEED_REACH = 76;
+
+/* A name of its own, same as a tree's, so pulling one always
+   removes the one he's standing at. */
+let WEED_ID_SEQ = 0;
+function nextWeedId() {
+  WEED_ID_SEQ++;
+  return 'w' + Date.now().toString(36) + '-' + WEED_ID_SEQ.toString(36);
+}
+
+function newWeed(areaKey, x, y) {
+  return {
+    id: nextWeedId(),
+    ar: areaKey,       // which area it's in
+    x: Math.round(x),  // and where, in screen pixels, like every prop
+    y: Math.round(y)
+  };
+}
+
 /* ---- where the beds are ------------------------------------
    Six raised beds in the patch of back lawn that's been left
    empty since Stage 1 — two rows of three. Counted in map
@@ -3033,7 +3124,7 @@ const PLOT_TILES_W = 2;
 /* ---- a brand-new, empty garden ----------------------------- */
 function newGarden() {
   return {
-    v: 3,
+    v: 4,
     day: null,
     plots: GARDEN_PLOTS.map(() => ({
       seed: null, stage: 0, wilted: false, watered: false, care: 0, picked: 0
@@ -3042,7 +3133,14 @@ function newGarden() {
     // entry per tree he has actually planted, each one carrying its
     // own area and position. Nothing about the map decides what's
     // in here any more — only what he did.
-    trees: []
+    trees: [],
+    // The weeds standing on the lawn right now — written exactly
+    // like the trees, a plain list carrying area and position.
+    weeds: [],
+    // Which day the weeds were last sown for. Kept so that closing
+    // and reopening the app twice in one morning doesn't sow a
+    // second crop on top of the first.
+    wd: null
   };
 }
 
@@ -3148,7 +3246,10 @@ function loadGarden() {
     // his GARDEN — the beds have never changed — so nothing he has
     // grown is ever lost. Only the trees are version-fussy, and
     // that's handled below.
-    if (!data || (data.v !== 1 && data.v !== 2 && data.v !== 3) ||
+    // Version 4 adds the weeds. An older save simply has none in
+    // it, and a fresh crop turns up the next morning — so there is
+    // nothing to convert and nothing he can lose.
+    if (!data || (data.v !== 1 && data.v !== 2 && data.v !== 3 && data.v !== 4) ||
         !Array.isArray(data.plots)) return newGarden();
     const g = newGarden();
     g.day = typeof data.day === 'string' ? data.day : null;
@@ -3194,6 +3295,22 @@ function loadGarden() {
         });
       });
     }
+    /* The weeds. Read the same way and with the same guards as the
+       trees — an area that no longer exists, or a position that
+       isn't a position, is simply dropped. */
+    if (Array.isArray(data.weeds)) {
+      data.weeds.forEach(s => {
+        if (!s || !AREAS[s.ar]) return;
+        if (!isFinite(s.x) || !isFinite(s.y)) return;
+        g.weeds.push({
+          id: (typeof s.id === 'string' && s.id) ? s.id : nextWeedId(),
+          ar: s.ar,
+          x: Math.round(s.x),
+          y: Math.round(s.y)
+        });
+      });
+    }
+    g.wd = typeof data.wd === 'string' ? data.wd : null;
     return g;
   } catch (e) {
     return newGarden();
@@ -3735,14 +3852,23 @@ class PrairieScene extends Phaser.Scene {
        that has passed since, applying that day's actual weather. */
     this.garden = loadGarden();
     this.daysAway = catchUp(this.garden, dayKey(new Date()));
-    if (this.daysAway > 0) saveGarden(this.garden);
+    /* This morning's weeds, if today hasn't been sown yet. Done
+       here as well as in checkNewDay so that the very first launch
+       of a day has them waiting rather than an empty lawn until
+       midnight. It's a no-op on a second launch the same day.
+       Runs before the area is built, so the views for them go up
+       with everything else. */
+    const sown = this.sowWeeds();
+    if (this.daysAway > 0 || sown > 0) saveGarden(this.garden);
     this.weatherToday = weatherFor(this.garden.day);
     this.weatherTomorrow = weatherFor(nextDayKey(this.garden.day));
     this.activePlot = -1;
     this.activeTree = -1;
+    this.activeWeed = -1;
     this.menuOpen = false;
     this.plotViews = [];
     this.treeViews = [];
+    this.weedViews = [];
     this.signIcons = [];
     this.dedicationBox = null;
 
@@ -4072,6 +4198,15 @@ class PrairieScene extends Phaser.Scene {
     this.makeTexture('treehole', hsz.w, hsz.h, c => drawPixels(c, T_HOLE, HOLE_PAL));
     const qsz = gridSize(T_PLAQUE);
     this.makeTexture('plaque', qsz.w, qsz.h, c => drawPixels(c, T_PLAQUE, treePal));
+
+    /* ---- Stage 4: the weeds ----
+       One letter, one role. K is the darkest of the six, which on
+       a lawn painted in M reads as a distinctly scruffy dark-green
+       sprig — and because it's a role and not a hex, it walks
+       through all six times of day with everything else instead of
+       sitting there as a flat black cutout at dawn. */
+    const wdsz = gridSize(WEED_A);
+    this.makeTexture('weed', wdsz.w, wdsz.h, c => drawPixels(c, WEED_A, { K: pal.K }));
   }
 
   /* Henri's spritesheet — the whole thing is three frames now, off
@@ -4189,8 +4324,12 @@ class PrairieScene extends Phaser.Scene {
        group is thrown away and rebuilt a few lines below — so
        there's nothing separate to tidy up here. */
     if (this.treeGlow) { this.treeGlow.destroy(); this.treeGlow = null; }
+    if (this.weedViews) this.weedViews.forEach(v => v.img.destroy());
+    this.weedViews = [];
+    if (this.weedGlow) { this.weedGlow.destroy(); this.weedGlow = null; }
     this.activePlot = -1;
     this.activeTree = -1;
+    this.activeWeed = -1;
     this.actionVerbShown = null;
     if (this.textures.exists('ground')) this.textures.remove('ground');
 
@@ -4229,6 +4368,14 @@ class PrairieScene extends Phaser.Scene {
       .filter(t => t.ar === key)
       .forEach(t => this.addTreeView(t));
     this.refreshTrees();
+
+    /* And the weeds standing here, put up the same way from the
+       same save. Nothing solid goes with them — he walks over a
+       weed, he doesn't bump into it. */
+    this.buildWeedGlow();
+    this.garden.weeds
+      .filter(w => w.ar === key)
+      .forEach(w => this.addWeedView(w));
 
     const W = a.w * T, H = a.h * T;
     this.physics.world.setBounds(0, 0, W, H);
@@ -4359,11 +4506,6 @@ class PrairieScene extends Phaser.Scene {
       .setOrigin(0.5).setScale(2).setScrollFactor(0)
       .setDepth(D + 1).setVisible(false);
 
-    this.readout = this.add.text(10, 10, '', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#ffffff',
-      backgroundColor: 'rgba(0,0,0,0.35)', padding: { x: 6, y: 4 }
-    }).setScrollFactor(0).setDepth(D + 2);
-
     /* ---- the Plant a Tree button ----
        Deliberately its own small, quiet tap target up in the
        top-right corner, well away from both the joystick side and
@@ -4413,7 +4555,6 @@ class PrairieScene extends Phaser.Scene {
     // force the button to re-read itself, so the word and the
     // picture line themselves up again at the new size
     this.actionVerbShown = null;
-    this.readout.setPosition(safe.x + 10, safe.y + 10);
 
     /* The Plant button, tucked into the top-right corner. Anchored
        to the live right edge of the play area with a 16px margin,
@@ -4577,6 +4718,8 @@ class PrairieScene extends Phaser.Scene {
     if (this.activePlot >= 0) { this.doPlotAction(this.activePlot); return; }
     // Stage 4: and if he's at a planting spot, it does the trees.
     if (this.activeTree >= 0) { this.doTreeAction(this.activeTree); return; }
+    // Stage 4: and if he's standing over a weed, out it comes.
+    if (this.activeWeed >= 0) { this.pullWeed(this.activeWeed); return; }
     // Stage 5: and if Henri's right there with a rabbit about, off they go.
     if (this.activeHenri) this.startRabbitChase();
   }
@@ -4665,18 +4808,15 @@ class PrairieScene extends Phaser.Scene {
       this.activePlot = nearP;
       this.activeTree = nearT;
     }
-    this.activeHenri = (this.activePlot < 0 && this.activeTree < 0) ? this.nearestHenriForChase() : false;
+    /* A weed only ever gets the button when there's nothing else
+       to do with it. A bed and a tree are both bigger jobs than a
+       weed, and a weed will still be there in two steps' time. */
+    this.activeWeed = (this.activePlot < 0 && this.activeTree < 0) ? this.nearestWeed() : -1;
+    this.activeHenri = (this.activePlot < 0 && this.activeTree < 0 && this.activeWeed < 0)
+      ? this.nearestHenriForChase() : false;
     this.updatePlotHint();
     this.stepRain(delta);
     this.updateHenriCue(delta);
-
-    this.readout.setText([
-      `fps     ${Math.round(this.game.loop.actualFps)}`,
-      `where   ${this.areaKey}`,
-      `facing  ${this.facing}`,
-      `day     ${this.garden.day}`,
-      `weather ${this.weatherToday}`
-    ].join('\n'));
   }
 
   checkSigns() {
@@ -4827,9 +4967,20 @@ class PrairieScene extends Phaser.Scene {
       }
     }
 
+    // and a smaller one again for a weed
+    if (this.weedGlow) {
+      if (this.activeWeed >= 0) {
+        const v = this.weedViews[this.activeWeed];
+        this.weedGlow.setPosition(v.x, v.y - 5).setVisible(true);
+      } else {
+        this.weedGlow.setVisible(false);
+      }
+    }
+
     let verb = i >= 0 ? this.plotVerb(i) : '';
     const atBed = !!verb;                 // is this a garden bed, or a tree?
     if (!verb && this.activeTree >= 0) verb = this.treeVerb(this.activeTree);
+    if (!verb && this.activeWeed >= 0) verb = 'PULL';
     if (!verb && this.activeHenri) verb = 'CHASE!';
 
     /* Which little picture belongs on the button, if any. Watering
@@ -5182,6 +5333,149 @@ class PrairieScene extends Phaser.Scene {
     saveGarden(this.garden);
     this.refreshTrees();
     this.actionVerbShown = null;
+  }
+
+  /* ---------------------------------------------------------
+     STAGE 4 — THE WEEDS
+     ------------------------------------------------------------
+     Sown by the morning, pulled by his thumb. Everything down
+     here is the same three jobs the trees have: deciding where
+     one may go, putting it on screen, and listening for a tap.
+     --------------------------------------------------------- */
+
+  /* The soft ring that says "you're standing at a weed" — the
+     same one the trees have, only smaller and lower. */
+  buildWeedGlow() {
+    this.weedGlow = this.add.ellipse(0, 0, 34, 20, 0xfff2c4, 0.10)
+      .setVisible(false).setDepth(3);
+    this.weedGlow.setStrokeStyle(3, 0xfff2c4, 0.85);
+  }
+
+  /* ---- can a weed go here? ----------------------------------
+     canPlantAt's first three questions and no more. Inside the
+     map, plain turf underfoot, nothing already standing there —
+     then a small gap from his trunks and from the other weeds.
+     The canopy and doorway clearances a tree needs are skipped
+     on purpose: a weed is a few inches across and it may sit as
+     near a bench or a gate as it likes.
+
+     Takes the area to test against rather than reading this.area,
+     because the morning's weeds are sown for every area at once —
+     including the one he isn't standing in. */
+  canWeedAt(x, y, a, areaKey) {
+    if (!a) return false;
+
+    // 1. inside the map at all?
+    if (x < T || y < T || x > (a.w - 1) * T || y > (a.h - 1) * T) return false;
+
+    // 2. plain turf underfoot, across the whole little rosette
+    const half = WEED_BLOCK[0] / 2;
+    for (const px of [x - half, x, x + half]) {
+      const col = Math.floor(px / T), row = Math.floor((y - 1) / T);
+      if (col < 0 || row < 0 || col >= a.w || row >= a.h) return false;
+      if (!WEED_GROUND[a.get(col, row)]) return false;
+    }
+
+    // 3. anything already standing there — a house, a fence, a
+    //    bush, a garden bed?
+    const bx = x - half, by = y - WEED_BLOCK[1];
+    const bw = WEED_BLOCK[0], bh = WEED_BLOCK[1];
+    for (const s of a.solids) {
+      if (bx < s.x + s.w && bx + bw > s.x && by < s.y + s.h && by + bh > s.y) return false;
+    }
+
+    /* 4. and the one clearance it keeps: a small gap from his own
+       trees and from every other weed, so nothing sprouts inside a
+       sapling's ring of earth or on top of yesterday's. */
+    for (const t of this.garden.trees) {
+      if (t.ar !== areaKey) continue;
+      if (Phaser.Math.Distance.Between(x, y, t.x, t.y) < WEED_CLEAR) return false;
+    }
+    for (const w of this.garden.weeds) {
+      if (w.ar !== areaKey) continue;
+      if (Phaser.Math.Distance.Between(x, y, w.x, w.y) < WEED_CLEAR) return false;
+    }
+
+    return true;
+  }
+
+  /* ---- the morning's crop -----------------------------------
+     Two or three per area, dropped at random and thrown away
+     again if they land somewhere they can't be. Tries a fixed
+     number of times and then gives up rather than hunting for a
+     gap forever — on a crowded morning he simply gets fewer, and
+     nobody will ever count them.
+
+     Sows for every unlocked outdoor area, not just the one he's
+     standing in, so the park isn't suspiciously spotless the
+     first time he walks over. */
+  sowWeeds() {
+    if (this.garden.wd === this.garden.day) return 0;
+
+    let sown = 0;
+    Object.keys(WEED_AREAS).forEach(key => {
+      const def = AREAS[key];
+      if (!def) return;
+      // A throwaway copy of the map, built the same way entering an
+      // area builds one — it's only read, never drawn.
+      const a = new AreaData(def.w, def.h);
+      def.build(a);
+
+      const want = Phaser.Math.Between(WEEDS_PER_DAY[0], WEEDS_PER_DAY[1]);
+      for (let n = 0; n < want; n++) {
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const x = Phaser.Math.Between(T, (a.w - 1) * T);
+          const y = Phaser.Math.Between(T, (a.h - 1) * T);
+          if (!this.canWeedAt(x, y, a, key)) continue;
+          const w = newWeed(key, x, y);
+          this.garden.weeds.push(w);
+          // it has to show up right away if it landed where he's
+          // standing — no map reload is coming to do it for us
+          if (key === this.areaKey && this.weedViews) this.addWeedView(w);
+          sown++;
+          break;
+        }
+      }
+    });
+
+    this.garden.wd = this.garden.day;
+    return sown;
+  }
+
+  /* Put one weed on screen. No solid box and no ring of earth —
+     it's a small thing sitting on the grass that he walks over. */
+  addWeedView(w) {
+    const img = this.add.image(w.x, w.y, 'weed')
+      .setOrigin(0.5, 1).setScale(SCALE).setDepth(w.y);
+    this.weedViews.push({ id: w.id, x: w.x, y: w.y, img });
+    return this.weedViews[this.weedViews.length - 1];
+  }
+
+  /* Which weed is he standing at? -1 for none. The same
+     nearest-thing-within-arm's-reach test the trees use. */
+  nearestWeed() {
+    if (!this.weedViews || !this.weedViews.length) return -1;
+    let best = -1, bestD = WEED_REACH;
+    this.weedViews.forEach((v, i) => {
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, v.x, v.y - 6);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  /* Pull it: gone from the save, gone from the screen. There is
+     nothing to undo and nothing to keep. */
+  pullWeed(i) {
+    const v = this.weedViews[i];
+    if (!v) return;
+    this.garden.weeds = this.garden.weeds.filter(w => w.id !== v.id);
+    v.img.destroy();
+    this.weedViews.splice(i, 1);
+    this.activeWeed = -1;
+    if (this.weedGlow) this.weedGlow.setVisible(false);
+    saveGarden(this.garden);
+    this.actionVerbShown = null;   // so the button re-reads itself
+    this.toast('Pulled a weed.', 1600);
   }
 
   /* ---- his own words ---------------------------------------
@@ -5698,6 +5992,9 @@ class PrairieScene extends Phaser.Scene {
     const passed = catchUp(this.garden, today);
     this.weatherToday = weatherFor(this.garden.day);
     this.weatherTomorrow = weatherFor(nextDayKey(this.garden.day));
+    // and this morning's weeds, sown right alongside the new
+    // weather and the night's growth
+    this.sowWeeds();
     saveGarden(this.garden);
     this.refreshGarden();
     this.refreshTrees();

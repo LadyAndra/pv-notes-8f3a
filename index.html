@@ -252,7 +252,7 @@
     const round = (n) => Math.round(n * 100) / 100;
     const lines = [
       'PRAIRIE VILLAGE — screen check',
-      'BUILD 4   (if this does not say BUILD 4,',
+      'BUILD 5   (if this does not say BUILD 5,',
       '           the device is still on old files)',
       '',
       'window        ' + innerWidth + ' x ' + innerHeight,
@@ -288,15 +288,43 @@
     if (on) { report(); timer = setInterval(report, 500); }
   }
 
-  window.addEventListener('touchstart', (e) => {
-    if (e.touches && e.touches.length === 3) toggle();
-  }, { capture: true, passive: true });
+  /* ---- how to summon this panel ------------------------------
+     Both of the old ways to open it turned out to be things a
+     PLAYER does by accident, which is exactly what a debug panel
+     must never be:
 
+       - pressing D was the shortcut on a laptop, but D is also
+         "walk right" in the WASD controls, so simply walking
+         right threw a wall of developer text over the game
+       - three fingers down at once was the shortcut on a tablet,
+         but the game already expects several fingers at a time
+         (thumb on the joystick, thumb on the action button), so
+         a stray third finger or a resting palm would do it in
+         the middle of playing
 
-  // On a laptop, press D instead.
+     Both are gone. It now takes something nobody would ever do
+     by accident: hold Ctrl and Shift and press D on a laptop, or
+     tap the very top-left corner of the screen five times
+     quickly on a tablet. That corner is deliberately chosen —
+     it's the one part of the screen with no control on it. */
+
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'd' || e.key === 'D') toggle();
+    if ((e.key === 'd' || e.key === 'D') && e.ctrlKey && e.shiftKey) toggle();
   }, true);
+
+  const CORNER = 60;      // how big the tap target is, in screen pixels
+  const WINDOW_MS = 1200; // all five taps have to land inside this
+  let taps = [];
+  window.addEventListener('touchstart', (e) => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    const now = Date.now();
+    // only taps in the top-left corner count, and only recent ones
+    if (t.clientX > CORNER || t.clientY > CORNER) { taps = []; return; }
+    taps = taps.filter(ts => now - ts < WINDOW_MS);
+    taps.push(now);
+    if (taps.length >= 5) { taps = []; toggle(); }
+  }, { capture: true, passive: true });
 })();
 </script>
 
@@ -306,6 +334,6 @@
      running last week's game.js forever. Changing this number forces
      it to fetch a fresh copy. Bump it to v=4, v=5 and so on for any
      future update. -->
-<script src="game.js?v=4"></script>
+<script src="game.js?v=5"></script>
 </body>
 </html>
