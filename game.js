@@ -2958,21 +2958,153 @@ const STAGE_NAMES = ['just planted', 'sprouting', 'growing', 'ready'];
 
 const TREE_DAYS_PER_STAGE = 5;
 
+/* `size` is HOW TALL A FULLY GROWN ONE SHOULD BE ON SCREEN, in
+   pixels. It is the only number you need to change to make a
+   tree bigger or smaller, and it has nothing whatever to do with
+   how many rows of letters the drawing happens to be. Change the
+   number, get that tree. See THE SIZING SYSTEM just below. */
 const TREES = [
-  { id: 'buroak', name: 'Bur Oak', form: 'round',
+  { id: 'buroak', name: 'Bur Oak', form: 'round', size: 93,
     blurb: 'Broad, tough, and older than the town.' },
-  { id: 'redbud', name: 'Eastern Redbud', form: 'round',
+  { id: 'redbud', name: 'Eastern Redbud', form: 'round', size: 81,
     blurb: 'Small and low, magenta along every branch.' },
-  { id: 'serviceberry', name: 'Serviceberry', form: 'upright',
+  { id: 'serviceberry', name: 'Serviceberry', form: 'upright', size: 96,
     blurb: 'Slim and forked. First to flower in spring.' },
-  { id: 'hickory', name: 'Shagbark Hickory', form: 'upright',
+  { id: 'hickory', name: 'Shagbark Hickory', form: 'upright', size: 108,
     blurb: 'Narrow and tall, with bark that peels in plates.' },
-  { id: 'sycamore', name: 'American Sycamore', form: 'upright',
+  /* The one number changed when the sizing system went in. It had
+     been 126 for no better reason than that its drawing happened
+     to be 42 rows tall, which left "the giant" shorter than its
+     own blurb and narrower than the bur oak. 168 is the next
+     clean step up for a 42-row grid (4x), and puts it a clear head
+     above everything else he can plant. */
+  { id: 'sycamore', name: 'American Sycamore', form: 'upright', size: 168,
     blurb: 'The giant. You can spot its pale trunk for miles.' }
 ];
 function treeById(id) { return TREES.find(t => t.id === id) || null; }
 
 const TREE_STAGE_NAMES = ['a sapling', 'young', 'fully grown'];
+
+/* ============================================================
+   THE SIZING SYSTEM  (trees)
+   ------------------------------------------------------------
+   THE PROBLEM THIS SOLVES. Every other picture in the game is
+   blown up by the same SCALE of 3, which means how big a thing
+   looks is decided entirely by how many rows of letters someone
+   happened to draw it with. That was fine while every tree was
+   drawn by hand to fit. It stopped being fine the moment the
+   trees started coming out of Midjourney and Sprite Forge,
+   because that pipeline hands back whatever resolution it feels
+   like, and there is no reason on earth why "the number of rows
+   the exporter chose" should decide "how big an oak looks in a
+   Kansas backyard".
+
+   SO THE ARROW IS TURNED ROUND. Each species says how tall it
+   should be ON SCREEN (its `size`, up in the TREES list). The
+   game measures the drawing, divides one by the other, and uses
+   whatever multiplier that comes to. Feed it a taller grid and
+   the multiplier drops; feed it a shorter one and it rises. The
+   tree stays the size you asked for either way.
+
+   ONE DELIBERATE ROUNDING. That multiplier is rounded to a whole
+   number, and it matters. Pixel art blown up by 3.57 gets some
+   of its pixels 3 screen-dots wide and some 4, and the result
+   is a subtly mushy, unevenly-stepped tree that no longer
+   matches everything around it. Whole numbers keep every pixel
+   the same size as every other pixel in the game. So `size` is
+   read as "get as close to this as clean pixels allow" rather
+   than as an exact promise, and the way to hit a size exactly is
+   to export the art at a grid that divides into it — a 50-row
+   sycamore at 3x is exactly 150 tall.
+
+   WIDTH LOOKS AFTER ITSELF. One multiplier is applied to both
+   directions, so a tree is never squashed or stretched. Every
+   tree grid here is taller than it is wide, so height is what
+   the target names; treeMetrics() below still reports the width
+   that falls out of it, which is what the spacing rule uses.
+
+   COULD THIS WORK FOR EVERYTHING ELSE? Yes, and Henri is the
+   proof it was always heading this way — he has had his own
+   CRITTER_SCALE from the start, which is this same idea with one
+   entry. Bushes, furniture, the player himself could each carry
+   a `size` and go through the same three lines. That is left
+   alone on purpose: the trees are where the new art pipeline
+   actually lands, and there is no sense rebuilding the sizing of
+   sprites nobody is regenerating.
+   ============================================================ */
+
+/* Which letter grid each species is drawn from. Up here rather
+   than tucked inside the drawing code, because the measuring
+   below has to reach it before anything is ever drawn. */
+const TREE_GRIDS = {
+  buroak: T_BUROAK, redbud: T_REDBUD, serviceberry: T_SERVICEBERRY,
+  hickory: T_HICKORY, sycamore: T_SYCAMORE
+};
+
+/* The two stages before a tree becomes its own species share one
+   drawing between all five, so their targets live here rather
+   than on any one of them. These are the sizes they have always
+   been, kept deliberately: a sapling is a sapling. */
+const TREE_STAGE_SIZE = { sapling: 54, round: 72, upright: 78 };
+
+/* A cell with nothing in it. The game's own grids use '.', and
+   Sprite Forge writes ',' for the same thing, so both are read
+   as empty and a grid straight out of the exporter measures
+   correctly without being converted first. */
+const ART_BLANK = { '.': 1, ' ': 1, ',': 1 };
+
+/* How wide the trunk is, in art pixels, measured off the bottom
+   three rows of the drawing rather than written down by hand.
+   That matters: it means a tree that arrives from Sprite Forge
+   at some unfamiliar resolution gets a trunk box that fits it,
+   with nothing for anyone to remember to update. */
+function trunkWidth(rows) {
+  let lo = Infinity, hi = -1;
+  for (const r of rows.slice(-3)) {
+    for (let x = 0; x < r.length; x++) {
+      if (ART_BLANK[r[x]]) continue;
+      if (x < lo) lo = x;
+      if (x > hi) hi = x;
+    }
+  }
+  return hi < 0 ? 1 : (hi - lo + 1);
+}
+
+/* Everything about one drawing at one target size, worked out
+   once when the game starts rather than every frame. */
+function measureTree(rows, targetH) {
+  const g = gridSize(rows);
+  const scale = Math.max(1, Math.round(targetH / g.h));
+  return {
+    scale: scale,
+    w: g.w * scale,                    // how wide it ends up on screen
+    h: g.h * scale,                    // and how tall, which is what `size` asked for
+    trunk: Math.round(trunkWidth(rows) * scale)
+  };
+}
+
+const TREE_METRICS = (function () {
+  const m = {
+    sapling:       measureTree(T_SAPLING,        TREE_STAGE_SIZE.sapling),
+    young_round:   measureTree(T_YOUNG_ROUND,    TREE_STAGE_SIZE.round),
+    young_upright: measureTree(T_YOUNG_UPRIGHT,  TREE_STAGE_SIZE.upright)
+  };
+  TREES.forEach(t => { m[t.id] = measureTree(TREE_GRIDS[t.id], t.size); });
+  return m;
+})();
+
+/* The numbers for one species at one moment in its life. Stage 0
+   is a sapling and stage 1 a young tree, both of which every
+   species shares; only a fully grown one is itself. */
+function treeMetrics(speciesId, stage) {
+  if (stage === 0) return TREE_METRICS.sapling;
+  if (stage === 1) {
+    const sp = treeById(speciesId);
+    return (sp && sp.form === 'round') ? TREE_METRICS.young_round
+                                       : TREE_METRICS.young_upright;
+  }
+  return TREE_METRICS[speciesId] || TREE_METRICS.sapling;
+}
 
 /* ---- where a tree can go -----------------------------------
    Anywhere on open grass. He walks to the patch he likes, taps
@@ -2989,14 +3121,152 @@ const TREE_STAGE_NAMES = ['a sapling', 'young', 'fully grown'];
 
 /* How solid a planted tree is, in screen pixels. Sized to the
    trunk, not the canopy — so he can tuck in under the leaves
-   exactly like he can with every other tree in the game. */
-const TREE_BLOCK = [34, 16];
+   exactly like he can with every other tree in the game.
 
-/* The widest a grown tree ever gets, in screen pixels (the
-   sycamore, 28 art pixels across at SCALE 3). Used as the
-   minimum gap between two of his trees, so a grove reads as a
-   grove and never as two trunks in the same hole. */
-const TREE_CANOPY = 84;
+   Per species now, and measured off its own drawing, so a tree
+   that looks twice the size of its neighbour is twice the size
+   to walk into as well. Two deliberate details:
+
+   Always the FULLY GROWN width, even while it's still a sapling.
+   A tree's solid box never changes for as long as it stands, so
+   the space checked when it goes into the ground is the space it
+   will still need in ten days' time, and a tree can never grow
+   its way into a fence it was planted clear of.
+
+   The 16 is how far UP the trunk he can't walk, and that stays
+   shared. It isn't about how big the tree is; it's about how
+   much of the bottom of the picture reads as "trunk" rather than
+   "ground", and that's the same for all five. */
+function treeBlock(speciesId) {
+  return [(TREE_METRICS[speciesId] || TREE_METRICS.sapling).trunk, 16];
+}
+
+/* How wide a grown one of these gets on screen. Used for the gap
+   between two of his trees, so a grove reads as a grove and
+   never as two trunks in the same hole.
+
+   The rule is now pairwise — half of one plus half of the other,
+   which is exactly "their canopies don't overlap" — instead of
+   the single flat 84 every tree used to be measured against.
+   That 84 was a bur oak's width (the code used to credit the
+   sycamore for it, which was simply wrong: the oak is the widest
+   of the five, not the tallest). Two bur oaks still need every
+   bit of that 84 between them. Two shagbark hickories, which are
+   genuinely narrow trees, no longer have to stand a whole oak
+   apart and can finally read as a stand of hickories. */
+function treeCanopy(speciesId) {
+  return (TREE_METRICS[speciesId] || TREE_METRICS.sapling).w;
+}
+
+/* ---- GHOST TREES -------------------------------------------
+   What gets drawn on top of what is worked out from how far DOWN
+   the screen a thing is: lower means nearer, so it's drawn in
+   front. That's right almost everywhere — walk below a bush and
+   you pass in front of it, walk above it and you duck behind it,
+   exactly as you'd expect.
+
+   It falls apart on anything really tall. The big oak in Harmon
+   Park stands more than nine map squares high, so there's a band
+   of grass the size of a small yard where he is, in game terms,
+   standing perfectly innocently — and yet the canopy, drawn
+   upward from the foot of the trunk, covers him completely. He
+   disappears, and stays disappeared for several seconds of
+   walking, which is no fun at all.
+
+   The fix is the one every top-down game reaches for: the tree
+   he's currently lost inside goes see-through, and only that
+   one. Nothing about where he can walk changes, nothing about
+   planting or growing changes — this is purely about what the
+   eye can see.
+
+   To know whether a tree is really covering him we need the
+   SHAPE of the drawing, not just the box around it: an oak is a
+   round canopy on a narrow trunk, and the corners of its picture
+   are empty sky. So every tree drawing is measured once, when
+   the game starts, into a list of how far left and right each
+   row of it reaches. Asking "is this spot under a leaf" is then
+   a single lookup, and it's exact for every tree we have or ever
+   add — no hand-tuned oval per species to keep in step with the
+   art as it changes. */
+function artSilhouette(rows) {
+  const g = gridSize(rows);
+  return {
+    w: g.w,
+    h: g.h,
+    spans: rows.map(r => {
+      let lo = Infinity, hi = -1;
+      for (let x = 0; x < r.length; x++) {
+        if (ART_BLANK[r[x]]) continue;
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+      }
+      return hi < 0 ? null : [lo, hi];   // null: a blank row, nothing drawn here at all
+    })
+  };
+}
+
+/* Every drawing a tree can ever be wearing, measured. Keyed by
+   the name the picture is filed under, so the check can simply
+   ask a tree on screen what it's currently showing and look that
+   up — which means a sapling growing into a sycamore is handled
+   without anyone having to remember to tell this code about it.
+
+   Buildings are deliberately absent. The house is taller than
+   the oak and hides him too, but ducking behind a roofline reads
+   as deliberate in a way vanishing into leaves doesn't, and the
+   rabbit chase already steers around it on purpose. */
+const CANOPY_ART = (function () {
+  const m = {
+    oak: artSilhouette(OAK_ROWS),
+    tree_a: artSilhouette(TREE_A_ROWS),
+    tree_b: artSilhouette(TREE_B_ROWS),
+    tree_c: artSilhouette(TREE_C_ROWS),
+    pine: artSilhouette(PINE_ROWS),
+    tree_sapling: artSilhouette(T_SAPLING),
+    tree_young_round: artSilhouette(T_YOUNG_ROUND),
+    tree_young_upright: artSilhouette(T_YOUNG_UPRIGHT)
+  };
+  TREES.forEach(t => { m['tree_' + t.id] = artSilhouette(TREE_GRIDS[t.id]); });
+  return m;
+})();
+
+/* How see-through a ghosted tree goes, and how long the fade
+   takes. A short glide rather than a snap, so walking along the
+   edge of a canopy doesn't strobe. Both are here to be nudged
+   after seeing it on the iPad — that's the whole tuning job. */
+const GHOST_ALPHA = 0.4;
+const GHOST_FADE_MS = 200;
+
+/* A few art-pixels of slack, granted only to a tree that is
+   ALREADY faded. It takes a touch more to leave the zone than it
+   took to enter it, so standing right on the boundary and
+   shuffling can't flicker the tree on and off. */
+const GHOST_EDGE_SLACK = 3;
+
+/* Is the point (px, py), in screen pixels, under a drawn part of
+   this tree? `img` is the tree as it stands on screen and `sil`
+   is its measured shape. Both kinds of tree in the game are
+   pinned by the middle of their base, which is exactly what lets
+   one sum serve the hand-placed oak and a tree he planted
+   himself. */
+function artCoversPoint(img, sil, px, py, slack) {
+  const s = img.scaleX || 1;
+  const gx = (px - img.x) / s + sil.w / 2;   // across the drawing
+  const gy = (py - img.y) / s + sil.h;       // and down it, from the top
+  if (gy < 0 || gy >= sil.h) return false;
+  const span = sil.spans[Math.floor(gy)];
+  if (!span) return false;
+  return gx >= span[0] - slack && gx <= span[1] + 1 + slack;
+}
+
+/* How far up him to test. Not his feet: a tree covering only his
+   boots is no trouble at all, and testing them would have half
+   the park's bushes fading. Chest and head, because the entire
+   point is being able to SEE him, and leaves over his head hide
+   him just as thoroughly as leaves over the rest. Fractions of
+   his own height rather than pixel counts, so the same two
+   numbers work for Henri, who is less than half Mike's size. */
+const GHOST_TEST_HEIGHTS = [0.45, 0.8];
 
 /* How far in front of him a new tree lands. One map square:
    far enough that its trunk box never spawns on top of his
@@ -3101,7 +3371,7 @@ const WEED_BLOCK = [12, 10];
 /* The one clearance a weed does keep: a small gap from a trunk or
    from another weed, so one never sprouts inside his sapling's
    ring of earth or lands on top of yesterday's. Much smaller than
-   TREE_CANOPY on purpose. */
+   any tree's canopy on purpose. */
 const WEED_CLEAR = 30;
 
 /* How close he has to stand for the button to read PULL. A little
@@ -3140,7 +3410,7 @@ const PLOT_TILES_W = 2;
 /* ---- a brand-new, empty garden ----------------------------- */
 function newGarden() {
   return {
-    v: 5,
+    v: 6,
     day: null,
     plots: GARDEN_PLOTS.map(() => ({
       seed: null, stage: 0, wilted: false, watered: false, care: 0, picked: 0
@@ -3167,7 +3437,14 @@ function newGarden() {
     // Which day the weeds were last sown for. Kept so that closing
     // and reopening the app twice in one morning doesn't sow a
     // second crop on top of the first.
-    wd: null
+    wd: null,
+    /* Version 6 — every weed he has ever pulled.
+       A weed is thrown away the instant it's pulled, so unlike a
+       crop there is nothing left behind to count afterwards. If
+       the number isn't banked at the moment of pulling it is gone
+       for good. One plain running total rather than a breakdown,
+       because there is only ever the one kind of weed. */
+    wp: 0
   };
 }
 
@@ -3283,8 +3560,11 @@ function loadGarden() {
     // at nothing and counts honestly from the next tomato on.
     // Agreed with Andra: it was never once shown on screen, so
     // there is nothing there for him to miss.
+    // Version 6 adds the weeds-pulled count, and the same applies:
+    // nothing was counting before, so an older save starts at nil
+    // and counts truthfully from his next weed on.
     if (!data || (data.v !== 1 && data.v !== 2 && data.v !== 3 &&
-                  data.v !== 4 && data.v !== 5) ||
+                  data.v !== 4 && data.v !== 5 && data.v !== 6) ||
         !Array.isArray(data.plots)) return newGarden();
     const g = newGarden();
     g.day = typeof data.day === 'string' ? data.day : null;
@@ -3314,6 +3594,10 @@ function loadGarden() {
         if (n > 0) g.crop[id] = n;
       });
     }
+    /* The weeds he has pulled. Read as carefully as everything
+       else: anything that isn't a sensible whole number reads as
+       none, rather than being trusted into the save. */
+    g.wp = Math.max(0, data.wp | 0);
     /* Trees. Only the new free-placement shape (a LIST) is read.
        An old version-2 save holds the nine-fixed-spots shape (a
        lookup), which has no positions in it at all and can't be
@@ -3943,6 +4227,9 @@ class PrairieScene extends Phaser.Scene {
     this.facing = 'down';
     this.transitioning = false;
     this.worldObjects = [];
+    /* The trees standing here that are allowed to go see-through
+       when he's lost behind one. Filled in as the area is built. */
+    this.ghostTrees = [];
 
     this.input.on('pointerdown', (p) => this.onDown(p));
     this.input.on('pointermove', (p) => this.onMove(p));
@@ -4224,10 +4511,12 @@ class PrairieScene extends Phaser.Scene {
       this.makeTexture(key, sz.w, sz.h, c => drawPixels(c, rows, treePal));
     });
 
-    const TREE_GRIDS = {
-      buroak: T_BUROAK, redbud: T_REDBUD, serviceberry: T_SERVICEBERRY,
-      hickory: T_HICKORY, sycamore: T_SYCAMORE
-    };
+    /* Which grid belongs to which species now lives up beside the
+       TREES list, because the sizing system has to measure these
+       long before anything gets drawn. Pictures are still made at
+       their exact letter-grid size, unchanged — the target size is
+       applied when the tree is put on screen, not when it's drawn,
+       so one picture can serve a tree at any size we ask for. */
     const TREE_BLOSSOM = {
       redbud:       { F: '#d47ab8', f: '#a3468c' },
       serviceberry: { F: '#f7f2e4', f: '#8d3a3a' }
@@ -4354,6 +4643,13 @@ class PrairieScene extends Phaser.Scene {
     def.build(a);
 
     // tidy away whatever was here before
+    /* The see-through trees are borrowed from the two lists below —
+       the scenery standing about and his own planted trees — so the
+       list is emptied first and refilled as those are rebuilt. Any
+       fade still gliding along is stopped before the tree it was
+       fading gets thrown away. */
+    if (this.ghostTrees) this.ghostTrees.forEach(g => this.tweens.killTweensOf(g));
+    this.ghostTrees = [];
     if (this.worldObjects) this.worldObjects.forEach(o => o.destroy());
     this.worldObjects = [];
     if (this.blockerCollider) { this.blockerCollider.destroy(); this.blockerCollider = null; }
@@ -4395,6 +4691,14 @@ class PrairieScene extends Phaser.Scene {
         img.setOrigin(0, 0).setDepth(p.y + T - 8);
       } else {
         img.setOrigin(0.5, 1).setDepth(p.y);
+        /* Tall enough to swallow him whole? Then it's allowed to go
+           see-through while it's doing it. Deliberately just the big
+           oak for now — it's the one that actually loses him, and
+           getting the fade feeling right on one tree beats getting
+           it wrong on a dozen. The park's smaller trees and his own
+           planted ones join this line once the oak has been seen on
+           the iPad. */
+        if (p.key === 'oak') this.ghostTrees.push(img);
       }
       this.worldObjects.push(img);
     });
@@ -4828,6 +5132,11 @@ class PrairieScene extends Phaser.Scene {
 
     this.updateHenri(delta, moving);
 
+    /* Everyone's place in the draw order is settled by now, which
+       is exactly what this needs to know: has anything ended up
+       drawn on top of him? */
+    this.updateGhostTrees();
+
     this.checkSigns();
     this.checkExits();
 
@@ -5010,6 +5319,10 @@ class PrairieScene extends Phaser.Scene {
     if (this.treeGlow) {
       if (this.activeTree >= 0) {
         const v = this.treeViews[this.activeTree];
+        // sized to the trunk he's actually standing at, so the ring
+        // hugs a redbud and stretches round an oak
+        const t = this.treeById_(v.id);
+        if (t) this.treeGlow.setSize(treeBlock(t.sp)[0] + 22, 28);
         this.treeGlow.setPosition(v.x, v.y - 7).setVisible(true);
       } else {
         this.treeGlow.setVisible(false);
@@ -5147,7 +5460,9 @@ class PrairieScene extends Phaser.Scene {
   /* The soft ring of light that says "you're standing at a tree".
      One per area, made when he walks in, moved around as needed. */
   buildTreeGlow() {
-    this.treeGlow = this.add.ellipse(0, 0, TREE_BLOCK[0] + 22, 28, 0xfff2c4, 0.10)
+    // Built at a bur oak's width and then resized to fit whichever
+    // tree he's actually standing at, each time it's shown.
+    this.treeGlow = this.add.ellipse(0, 0, treeBlock('buroak')[0] + 22, 28, 0xfff2c4, 0.10)
       .setVisible(false).setDepth(3);
     this.treeGlow.setStrokeStyle(3, 0xfff2c4, 0.85);
   }
@@ -5162,19 +5477,26 @@ class PrairieScene extends Phaser.Scene {
     // in front of it.
     const hole = this.add.image(t.x, t.y, 'treehole')
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(2);
+    /* The ring of earth and the plaque stay on the shared SCALE:
+       they're ground furniture, the same at the foot of any tree,
+       and nothing about a bigger sycamore should make its little
+       brass plaque bigger too. Only the TREE gets its own size,
+       set in refreshTrees() a moment from now along with which
+       picture it's showing. */
     const tree = this.add.image(t.x, t.y, 'tree_sapling')
-      .setOrigin(0.5, 1).setScale(SCALE).setDepth(t.y).setVisible(false);
+      .setOrigin(0.5, 1).setScale(TREE_METRICS.sapling.scale)
+      .setDepth(t.y).setVisible(false);
     const plaque = this.add.image(t.x + 23, t.y + 3, 'plaque')
       .setOrigin(0.5, 1).setScale(SCALE).setDepth(t.y + 3).setVisible(false);
 
-    /* Its trunk, made solid — sized the same as every other tree
-       in the game, so he can stand under the leaves but never
-       inside the trunk. Added to the same group of solid things
-       the fences and houses are in, so it's rebuilt and thrown
-       away with them automatically. */
-    const bx = t.x - TREE_BLOCK[0] / 2, by = t.y - TREE_BLOCK[1];
-    const z = this.add.zone(bx + TREE_BLOCK[0] / 2, by + TREE_BLOCK[1] / 2,
-                            TREE_BLOCK[0], TREE_BLOCK[1]);
+    /* Its trunk, made solid, at this species' own width — so he
+       can stand under the leaves but never inside the trunk.
+       Added to the same group of solid things the fences and
+       houses are in, so it's rebuilt and thrown away with them
+       automatically. */
+    const blk = treeBlock(t.sp);
+    const bx = t.x - blk[0] / 2, by = t.y - blk[1];
+    const z = this.add.zone(bx + blk[0] / 2, by + blk[1] / 2, blk[0], blk[1]);
     this.blockers.add(z);
     z.body.updateFromGameObject();
 
@@ -5197,9 +5519,20 @@ class PrairieScene extends Phaser.Scene {
      one says no he gets a friendly nudge and nothing is planted.
      Takes the spot in screen pixels — the middle of where the
      trunk would sit. */
-  canPlantAt(x, y) {
+  canPlantAt(x, y, speciesId) {
     const a = this.area;
     if (!a) return false;
+
+    /* Which tree he's putting in changes how much room it needs,
+       so the checks below are asked about that species. It is
+       always known by the time this runs — he picks from the menu
+       first and the spot is judged at the moment he commits — but
+       if it somehow isn't, the widest of the five is assumed, so
+       an unknown falls on the cautious side rather than squeezing
+       a tree into a gap too small for it. */
+    const widest = TREES.reduce((a2, b) =>
+      treeCanopy(b.id) > treeCanopy(a2.id) ? b : a2).id;
+    const sp = TREE_METRICS[speciesId] ? speciesId : widest;
 
     // 1. is it inside the map at all?
     if (x < T || y < T || x > (a.w - 1) * T || y > (a.h - 1) * T) return false;
@@ -5207,7 +5540,8 @@ class PrairieScene extends Phaser.Scene {
     /* 2. is the ground under it plain turf? Checked across the
        whole width of the trunk, not just the middle, so half a
        tree can't hang out over a path. */
-    const half = TREE_BLOCK[0] / 2;
+    const blk = treeBlock(sp);
+    const half = blk[0] / 2;
     for (const px of [x - half, x, x + half]) {
       const col = Math.floor(px / T), row = Math.floor((y - 1) / T);
       if (col < 0 || row < 0 || col >= a.w || row >= a.h) return false;
@@ -5216,17 +5550,22 @@ class PrairieScene extends Phaser.Scene {
 
     // 3. is anything already standing there — a house, a fence,
     //    the big oak, a bush, a garden bed?
-    const bx = x - half, by = y - TREE_BLOCK[1];
-    const bw = TREE_BLOCK[0], bh = TREE_BLOCK[1];
+    const bx = x - half, by = y - blk[1];
+    const bw = blk[0], bh = blk[1];
     for (const s of a.solids) {
       if (bx < s.x + s.w && bx + bw > s.x && by < s.y + s.h && by + bh > s.y) return false;
     }
 
-    /* 4. is it a full canopy clear of his other trees? This is
-       what keeps a grove looking like a grove instead of two
-       trunks in one hole. */
+    /* 4. is it clear of his other trees? Half of this one's grown
+       canopy plus half of that one's, which is just a long way of
+       saying their leaves mustn't overlap. Both halves are the
+       FULLY GROWN width even when both trees are still sticks, so
+       a grove he plants today is still a grove in a month rather
+       than a thicket. */
+    const mine = treeCanopy(sp) / 2;
     for (const t of this.treesHere()) {
-      if (Phaser.Math.Distance.Between(x, y, t.x, t.y) < TREE_CANOPY) return false;
+      const need = mine + treeCanopy(t.sp) / 2;
+      if (Phaser.Math.Distance.Between(x, y, t.x, t.y) < need) return false;
     }
 
     /* 5. is it clear of the ways out and the signs? A tree over a
@@ -5267,12 +5606,77 @@ class PrairieScene extends Phaser.Scene {
       else if (t.st === 1) key = (sp.form === 'round') ? 'tree_young_round' : 'tree_young_upright';
       else key = 'tree_' + sp.id;
 
-      v.tree.setTexture(key).setVisible(true);
+      /* The picture and the size it's shown at are set together,
+         in the one place, so they can never disagree — a tree
+         wearing its grown-up drawing at its sapling size would be
+         a very confusing bug to go looking for. */
+      v.tree.setTexture(key)
+        .setScale(treeMetrics(t.sp, t.st).scale)
+        .setVisible(true);
       // a thirsty sapling goes the same grey-green a wilted
       // vegetable does — it's the one visual language for "this
       // wants water"
       v.tree.setTint(t.th ? 0x9aa07e : 0xffffff);
       v.plaque.setVisible(!!t.ded);
+    });
+  }
+
+  /* ---- the tree he's currently lost inside -------------------
+     Runs every frame, straight after everyone's place in the draw
+     order has been settled. Two questions per tree, both cheap:
+     is it drawn in FRONT of him at all, and if it is, is any part
+     of it actually sitting on top of him? Only a tree that
+     answers yes to both fades — every other tree on screen is
+     left exactly as it was, which is the whole point.
+
+     Note the tint set a few lines up in refreshTrees() and the
+     fade set here don't fight: one is the colour a tree is
+     painted, the other is how much of it you can see through.
+     A thirsty sapling standing behind nothing stays its full
+     grey-green. */
+  updateGhostTrees() {
+    const trees = this.ghostTrees;
+    if (!trees || !trees.length) return;
+
+    /* Who we're trying to keep in sight. Henri joins this list in
+       the next pass, once the fade has been seen on the iPad. */
+    const folk = [];
+    if (this.player && this.player.visible) folk.push(this.player);
+    if (!folk.length) return;
+
+    for (let i = 0; i < trees.length; i++) {
+      const g = trees[i];
+      if (!g.visible) continue;
+      const sil = CANOPY_ART[g.texture.key];
+      if (!sil) continue;
+
+      const slack = g.ghosted ? GHOST_EDGE_SLACK : 0;
+      let hidden = false;
+      for (let j = 0; j < folk.length && !hidden; j++) {
+        const c = folk[j];
+        // drawn behind him already? then it isn't hiding anyone
+        if (g.depth <= c.depth) continue;
+        const tall = c.displayHeight;
+        for (const f of GHOST_TEST_HEIGHTS) {
+          if (artCoversPoint(g, sil, c.x, c.y - tall * f, slack)) { hidden = true; break; }
+        }
+      }
+      this.setTreeGhost(g, hidden);
+    }
+  }
+
+  /* Fade one tree out, or back in — and only ever when it's
+     actually changing, so a tree sitting quietly at either end of
+     the range costs nothing at all frame to frame. */
+  setTreeGhost(img, on) {
+    if (!!img.ghosted === on) return;
+    img.ghosted = on;
+    this.tweens.killTweensOf(img);
+    this.tweens.add({
+      targets: img,
+      alpha: on ? GHOST_ALPHA : 1,
+      duration: GHOST_FADE_MS,
+      ease: 'Sine.easeOut'
     });
   }
 
@@ -5349,7 +5753,7 @@ class PrairieScene extends Phaser.Scene {
        menu opened — he may have been nudged along by a collision
        in between, and what matters is where he's standing now. */
     const spot = this.plantTarget();
-    if (!this.canPlantAt(spot.x, spot.y)) {
+    if (!this.canPlantAt(spot.x, spot.y, speciesId)) {
       this.toast('That spot’s a little crowded — try some open grass.', 2600);
       return;
     }
@@ -5532,9 +5936,16 @@ class PrairieScene extends Phaser.Scene {
     this.weedViews.splice(i, 1);
     this.activeWeed = -1;
     if (this.weedGlow) this.weedGlow.setVisible(false);
+    /* Banked before the save, because the weed itself is already
+       gone by this line — there is nothing to go back and count. */
+    this.garden.wp = Math.max(0, this.garden.wp | 0) + 1;
     saveGarden(this.garden);
     this.actionVerbShown = null;   // so the button re-reads itself
-    this.toast('Pulled a weed.', 1600);
+    /* Same shape as a harvest: the number every time, and the
+       first one said out loud rather than reported as "that's 1". */
+    this.toast(this.garden.wp === 1
+      ? 'Pulled a weed. The first of many.'
+      : "Pulled a weed. That's " + this.garden.wp + ' so far.', 1600);
   }
 
   /* ---- his own words ---------------------------------------
