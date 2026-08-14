@@ -2916,6 +2916,22 @@ const SEEDS = [
 ];
 function seedById(id) { return SEEDS.find(s => s.id === id) || null; }
 
+/* ---- the harvest tally -------------------------------------
+   How many of one crop he has brought in, ever. One door in and
+   out, so the counting and the reading can never disagree with
+   each other. Call it with add = 1 when he picks something and
+   it returns the new total; call it with nothing to just look.
+   A crop he has never picked reads as 0 and stays absent from
+   the save, which is what keeps the seed menu quiet until there
+   is actually something to tell him. */
+function harvestTally(g, id, add) {
+  if (!g) return 0;
+  if (!g.crop || typeof g.crop !== 'object') g.crop = {};
+  const now = Math.max(0, g.crop[id] | 0) + (add | 0);
+  if (add) g.crop[id] = now;
+  return now;
+}
+
 const STAGE_NAMES = ['just planted', 'sprouting', 'growing', 'ready'];
 
 /* ============================================================
@@ -3124,11 +3140,22 @@ const PLOT_TILES_W = 2;
 /* ---- a brand-new, empty garden ----------------------------- */
 function newGarden() {
   return {
-    v: 4,
+    v: 5,
     day: null,
     plots: GARDEN_PLOTS.map(() => ({
       seed: null, stage: 0, wilted: false, watered: false, care: 0, picked: 0
     })),
+    /* Version 5 — the harvest tally.
+       Every bed has always counted its own harvests in `picked`,
+       but a bed doesn't know or care WHICH crop it grew, so that
+       number could never answer the only question worth asking:
+       how many tomatoes has he actually brought in? This does.
+       One entry per crop he has ever picked, keyed by seed id.
+       A crop he has never picked simply isn't in here, which is
+       what lets the seed menu stay quiet until there's something
+       to say. Flowers never appear in here at all — they replant
+       rather than harvest, on purpose. */
+    crop: {},
     // Stage 4, reworked for free placement. A plain list now, one
     // entry per tree he has actually planted, each one carrying its
     // own area and position. Nothing about the map decides what's
@@ -3249,7 +3276,15 @@ function loadGarden() {
     // Version 4 adds the weeds. An older save simply has none in
     // it, and a fresh crop turns up the next morning — so there is
     // nothing to convert and nothing he can lose.
-    if (!data || (data.v !== 1 && data.v !== 2 && data.v !== 3 && data.v !== 4) ||
+    // Version 5 adds the harvest tally. A version-4 save counted
+    // harvests per BED and never per crop, so there is genuinely
+    // no way to work out from it how many of them were tomatoes.
+    // Rather than invent a number, an older save starts the tally
+    // at nothing and counts honestly from the next tomato on.
+    // Agreed with Andra: it was never once shown on screen, so
+    // there is nothing there for him to miss.
+    if (!data || (data.v !== 1 && data.v !== 2 && data.v !== 3 &&
+                  data.v !== 4 && data.v !== 5) ||
         !Array.isArray(data.plots)) return newGarden();
     const g = newGarden();
     g.day = typeof data.day === 'string' ? data.day : null;
@@ -3264,6 +3299,20 @@ function loadGarden() {
         care: Math.max(0, Math.min(2, s.care | 0)),
         picked: Math.max(0, s.picked | 0)
       };
+    }
+    /* The harvest tally. Read defensively, the same way everything
+       else here is: a crop that is no longer in the game is
+       dropped, and anything that isn't a sensible whole number is
+       ignored rather than trusted. An older save has no tally at
+       all, in which case this loop simply never runs and he
+       starts counting from his next harvest. */
+    if (data.crop && typeof data.crop === 'object') {
+      Object.keys(data.crop).forEach(id => {
+        const s = seedById(id);
+        if (!s || s.kind !== 'veg') return;
+        const n = Math.max(0, data.crop[id] | 0);
+        if (n > 0) g.crop[id] = n;
+      });
     }
     /* Trees. Only the new free-placement shape (a LIST) is read.
        An old version-2 save holds the nine-fixed-spots shape (a
@@ -5059,10 +5108,20 @@ class PrairieScene extends Phaser.Scene {
 
     if (verb === 'HARVEST') {
       const s = seedById(p.seed);
-      p.picked++;
+      p.picked++;                                   // this bed's own count, as before
+      const total = harvestTally(this.garden, s.id, 1);   // and the crop's running total
       p.seed = null; p.stage = 0; p.wilted = false; p.care = 0;
       this.commitGarden();
-      this.toast('Picked the ' + s.name.toLowerCase() + '. The bed is clear again.');
+      /* He gets the number back straight away as well as finding it
+         later in the seed pouch. The very first one is worth saying
+         out loud rather than reporting as "that's 1 so far" — and it
+         is said as "the first one in" rather than "the first of the
+         year", because the tally never resets and a line about years
+         would quietly start lying the moment one turned over. */
+      this.toast('Picked the ' + s.name.toLowerCase() + '. ' +
+        (total === 1
+          ? 'The first one in.'
+          : "That's " + total + ' so far.'));
       return;
     }
 
@@ -5935,6 +5994,20 @@ class PrairieScene extends Phaser.Scene {
       objs.push(this.add.text(px, ry, s.name,
         { fontFamily: font, fontSize: '17px', color: '#f6ecd6' })
         .setOrigin(0.5).setScrollFactor(0).setDepth(D + 3));
+
+      /* What he has brought in of this crop, ever, tucked against
+         the right-hand end of its own row. Only the vegetables can
+         ever have a number here — the four natives are replanted
+         rather than picked, which is the whole point of them — and
+         even a vegetable stays blank until the first one is in, so
+         a brand-new garden never greets him with a row of noughts. */
+      const brought = harvestTally(this.garden, s.id);
+      if (brought > 0) {
+        objs.push(this.add.text(px + (panelW - 26) / 2 - 14, ry,
+          brought + ' picked',
+          { fontFamily: font, fontSize: '12px', color: '#c9ab82' })
+          .setOrigin(1, 0.5).setScrollFactor(0).setDepth(D + 3));
+      }
     });
 
     const cy = Math.round(top + head + SEEDS.length * rowH + rowH / 2);
