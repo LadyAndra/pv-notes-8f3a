@@ -654,7 +654,7 @@ const RABBIT_COLORS = {
    cooldown logic to keep in sync, there's one switch here.
 
    >>> SET THIS TO false BEFORE THE AUGUST 12 REVEAL. <<< */
-const CHASE_TESTING_MODE = true;
+const CHASE_TESTING_MODE = false;
 function pickChaseCooldown() {
   return CHASE_TESTING_MODE
     ? 25000 + Math.random() * 25000          // testing: roughly every 25-50 seconds
