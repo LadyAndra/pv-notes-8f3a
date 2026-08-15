@@ -2712,6 +2712,26 @@ const T_HOLE = [
   '....KKKKKK....'
 ];
 
+/* ---- a rabbit hole under the paddock rail ------------------
+   A small scraped-out arch at the foot of a fence panel, wide
+   enough for a rabbit and nothing else. Four of them sit in the
+   corners of the paddock. They are the only way anything ever
+   leaves that pen, and only a rabbit fits. Painted with the same
+   letters as the planting hole above, so it picks up the same
+   turned-earth colours at every time of day. */
+const RABBIT_HOLE_ART = [
+  '..KKKKKKKK..',
+  '.KmmmmmmmmK.',
+  'KmmdddddmmmK',
+  'KmdddeeedddK',
+  'KmddeeeeeddK',
+  'KmdeeeeeeedK',
+  'KmdeeeeeeedK',
+  'KmmdeeeeddmK',
+  '.KmmddddmmK.',
+  '..KKllllKK..'
+];
+
 /* ---- the dedication plaque ---------------------------------
    A small marker on a short stake at the foot of the tree. The
    lines on it just mean "there are words here" — the actual
@@ -2770,21 +2790,16 @@ const ART = 16;
 const SCALE = 3;
 const T = ART * SCALE;          // 48 — one map square
 
-// Rabbit-chase minigame — paused after Aug 7. The chase itself works
-// (Henri, the rabbits, the timer, the win/lose flow all run fine), but
-// it lives in the open backyard sharing space with the garden beds and
-// trees, and that's produced a string of edge-of-map bugs (rabbits
-// spawning too close to the fence, one rabbit slipping out of bounds
-// while Henri's busy chasing another). The fix is to give it its own
-// small fenced paddock area instead of the shared yard — see
-// RABBIT_CHASE_PADDOCK_KICKOFF.md for the full plan. That's a
-// post-birthday project, not worth the time before Aug 12.
-//
-// Flipping this to false leaves all the chase code in place (nothing
-// deleted) but stops the cue rabbit from ever appearing, so the whole
-// minigame is quietly off for now. Flip it back to true once the
-// paddock rework lands, or to spot-check the old behavior.
-const RABBIT_CHASE_ENABLED = false;
+/* Rabbit-chase minigame. Paused after Aug 7 because it ran in the
+   open backyard, sharing a lawn with the garden beds and the trees,
+   and rabbits kept slipping out of the play patch. Switched back on
+   for the paddock rework, which moved the whole thing into its own
+   sealed pen. See the long note by the PADDOCK settings for why the
+   old bug can't come back.
+
+   Setting this to false stops the cue rabbit ever appearing, which
+   quietly turns the whole minigame off without removing any of it. */
+const RABBIT_CHASE_ENABLED = true;
 
 const SNAP_STEP = Math.PI / 4;  // movement snaps to 8 compass directions
 
@@ -3779,6 +3794,244 @@ class AreaData {
 
 const CLOSED_SIGN = 'Trail closed for maintenance — opening soon!';
 
+/* ---- the "!" over a rustling bush -------------------------
+   Drawn in the weather icons' two fixed bright colours so it reads
+   the same at every hour. F is the warm yellow, S the near-white
+   highlight down its left edge, K the outline. */
+const ALERT_MARK = [
+  '..KKKK..',
+  '.KSFFFK.',
+  '.KSFFFK.',
+  '.KSFFFK.',
+  '.KSFFFK.',
+  '.KSFFFK.',
+  '..KFFK..',
+  '..KKKK..',
+  '........',
+  '..KKKK..',
+  '.KSFFFK.',
+  '.KSFFFK.',
+  '..KKKK..'
+];
+
+/* Which bushes in the backyard a rabbit might be hiding behind.
+
+   One is picked at random each time, rather than always the same
+   bush, so he has to look around the yard instead of learning one
+   landmark and walking straight to it.
+
+   The list is shorter than the number of bushes actually out
+   there, and the omissions are deliberate. The one action button
+   can only offer one thing at a time, and a garden bed or a tree
+   beats a bush — quite rightly, since the gardening is the game
+   and the rabbit is the treat. So a bush standing within arm's
+   reach of a bed can never be investigated: walk up to it and the
+   button offers to plant instead, and the rabbit waits there
+   forever. The bush by the north-west corner of the garden is
+   exactly that case, at 91 pixels from the nearest bed, and it is
+   left off for that reason rather than for how it looks. Every
+   bush here is at least 130 pixels from every bed. */
+const CUE_BUSHES = [
+  { col: 24, row: 3.9 },
+  { col: 15.5, row: 10.9 },
+  { col: 24.5, row: 10.9 },
+  { col: 29.6, row: 12 },
+  { col: 5.6, row: 17.4 }
+];
+
+/* How close he has to get to a rustling bush for the button to
+   offer to look at it. A little over two squares: close enough
+   that it's clearly THAT bush he's at, far enough that he doesn't
+   have to hunt for the exact spot. */
+const CUE_REACH = 108;
+
+/* And how much room a bush needs around it to be worth choosing.
+   The bed and tree ranges are 92 and 96; this is comfortably past
+   both, so standing anywhere around the bush leaves the button
+   free to offer the rabbit. */
+const CUE_CLEARANCE = 130;
+
+/* How big the "!" is drawn. The same 3x the rest of the world uses,
+   named so the pulse tween can be written around it. */
+const CUE_MARK_SCALE = SCALE;
+
+/* Every message that appears at the bottom of the screen holds for
+   this much longer than whatever length was asked for.
+
+   Aug 14, off the iPad: they were all going by a touch too fast to
+   finish reading. One dial here rather than forty numbers scattered
+   across the file, so they all move together and stay in proportion
+   to each other. */
+const MESSAGE_HOLD_BONUS = 1800;
+
+/* Props that are really marks on the ground, not objects standing
+   on it. They get drawn underfoot instead of joining the normal
+   front-to-back sorting, so nobody can ever end up behind one. */
+const GROUND_MARKS = { rabbit_hole: true };
+
+/* ============================================================
+   THE RABBIT PADDOCK
+   ------------------------------------------------------------
+   Where the chase actually happens, as of the paddock rework.
+
+   The old chase ran in the open backyard, sharing a lawn with the
+   garden beds, the trees and the patio. That was the whole source
+   of the escape bugs: the "play patch" was an invisible rectangle
+   drawn inside a much bigger space, so the only thing stopping a
+   rabbit walking off into the rest of the yard was a spawn margin
+   and a bit of luck. Widening that margin made it rarer. It could
+   never make it impossible.
+
+   This does. The paddock is its own little place, and leaving it is
+   not something the game has to prevent, because there are three
+   separate walls in the way:
+
+   1. The rails. A closed rectangle of solid boxes with no gap in
+      it anywhere, corners included.
+   2. The boundary hedge. A second closed ring two squares thick
+      around the outside, the same trick the backyard uses to stand
+      in for "the rest of the block".
+   3. The edge of the world itself. Henri, Mike and the rabbit all
+      run on physics bodies set to be held inside the map.
+
+   Any one of those would do the job on its own. The old chase had
+   none of them: it had an invisible rectangle and a spawn margin,
+   which is why widening the margin only ever made the bug rarer.
+
+   On why the pen isn't simply the whole map. It was, at first, with
+   the rails right on the outermost squares. That looked wrong on an
+   iPad: the pen is smaller than the screen, so the camera had
+   nowhere to scroll and parked the whole thing in the top-left
+   corner with empty space down two sides. Sitting the pen inside a
+   larger map fixes that, and the grass and hedge you can now see
+   past the rails is the same thing you see past the backyard fence.
+
+   There is no doorway. Nothing here is a walkable exit. You arrive
+   when the chase starts and you leave when it ends.
+
+   The four rabbit holes are not gaps in any of the above. The rails
+   are solid the whole way round for everyone, rabbit included. A
+   hole is a marked spot on the ground, and a rabbit that is being
+   chased and gets close enough to one vanishes down it, which ends
+   the chase. That's a scripted moment, not a hole in the wall, so
+   it can't quietly turn back into the old bug.
+   ============================================================ */
+const PADDOCK = {
+  /* The map. Deliberately bigger than the largest iPad screen so
+     the camera always has somewhere to scroll. */
+  cols: 30, rows: 23,
+
+  /* The rails: a closed rectangle sitting inside that map. */
+  pen: { left: 4, right: 25, top: 4, bottom: 17 },
+
+  /* Where Mike and Henri arrive: bottom middle of the pen. */
+  spawn: { col: 14.5, row: 16.4 },
+
+  /* The open grass, in map squares, kept just inside the rails.
+     Nothing relies on this to keep anyone in any more. It is only
+     used to decide where a rabbit is allowed to appear. */
+  inset: { minCol: 4.9, maxCol: 25.1, minRow: 4.9, maxRow: 17.2 },
+
+  /* One in each inside corner, at the foot of the rails. They are
+     drawn underfoot (see GROUND_MARKS), so the bottom of the rail
+     draws over the top of each one and it reads as a scrape going
+     under the fence rather than a saucer sitting on the grass. */
+  holes: [
+    { col: 5.0, row: 5.0 },
+    { col: 25.0, row: 5.0 },
+    { col: 5.0, row: 17.0 },
+    { col: 25.0, row: 17.0 }
+  ],
+
+  /* How close a fleeing rabbit has to get to a hole to vanish down
+     it. Worth understanding before changing, in both directions. A
+     rabbit jammed right into a corner still sits about fifteen
+     pixels off the hole, because its own solid box holds it clear
+     of both rails: set this below that and a cornered rabbit could
+     never reach the hole it is sitting next to, quietly breaking
+     the mechanic while looking perfectly fine on screen. Set it
+     much higher and a rabbit merely running past the end of a rail
+     is counted as having gone down the hole, which makes losing
+     feel arbitrary instead of earned. */
+  holeReach: 46,
+
+  /* How close Henri has to get to the rabbit to have caught it.
+     His solid box is 28 across and the rabbit's is 18, so they are
+     touching at about 23. A little over that so it lands the
+     moment it looks like it should. */
+  catchReach: 32,
+
+  /* --- how fast everyone moves, and how long a round lasts ---
+
+     Aug 14, off the iPad: everything wanted to be quicker, because
+     it's a chase. Everyone was sped up by about a quarter, and the
+     clock came down from 45 seconds to 30 to match, so a round
+     still feels about as long as it used to while being a good deal
+     more frantic. Outside the chase Mike walks at his usual 190;
+     these only apply once Henri is off.
+
+     The gap between henriSpeed and rabbitSpeed is what decides how
+     quickly he closes, and it is the difficulty dial. Nearer to
+     henriSpeed is much harder. Past it and he can never run the
+     rabbit down in the open, only corner it. */
+  henriSpeed: 260,
+  mikeSpeed: 290,        // has to be the faster of the two, he starts behind
+  rabbitSpeed: 280,
+  rabbitWanderSpeed: 55,
+  rabbitFleeRadius: 190,
+  roundSeconds: 30,
+
+  /* --- how the rabbit runs ---
+
+     Aug 14: it used to flee dead away from Henri, which took it
+     straight to a wall and then straight along it into a corner, so
+     every round ended down a hole almost by default. That isn't a
+     chase, it's a funnel.
+
+     Three forces are mixed together instead, and the balance
+     between them is the whole behaviour:
+
+     fleeAway    how much it wants to be somewhere Henri isn't.
+     fleeCurve   how hard it breaks sideways as it goes, which is
+                 what turns a straight bolt into an arc. It swaps
+                 which way it leans every second or so, so it
+                 jinks rather than orbiting predictably.
+     wallShy     how strongly it peels away from a rail it is
+                 getting near. This is what keeps it out in the
+                 open running loops instead of hugging the edges.
+
+     wallShy fades out as Henri closes in. That matters: at arm's
+     length a cornered rabbit stops caring about the wall behind it
+     and takes the hole, which is exactly the ending you asked for.
+     It gets there because he drove it there, not because it was
+     heading that way all along. */
+  fleeAway: 1,
+  fleeCurve: 0.8,
+  wallShy: 1.7,
+  wallFeel: 155          // how far off a rail it starts to notice it
+};
+
+/* Worked out once from the squares above, because the chase asks
+   for them every single frame. */
+PADDOCK.zone = {
+  xMin: PADDOCK.inset.minCol * T, xMax: PADDOCK.inset.maxCol * T,
+  yMin: PADDOCK.inset.minRow * T, yMax: PADDOCK.inset.maxRow * T
+};
+PADDOCK.holePoints = PADDOCK.holes.map(h => ({ x: h.col * T, y: h.row * T }));
+
+/* The inside faces of the four rails, in screen pixels. Worked out
+   from the same numbers the map is built from, rather than typed in
+   again, so moving the pen can't leave these quietly pointing at
+   where it used to be. Only the rabbit's steering reads them, to
+   know which way "away from the fence" is. Nothing is kept inside
+   the pen by them. */
+PADDOCK.rails = {
+  xMin: PADDOCK.pen.left * T + 39,
+  xMax: PADDOCK.pen.right * T + 9,
+  yMin: PADDOCK.pen.top * T + 38,
+  yMax: PADDOCK.pen.bottom * T + 12
+};
+
 /* ============================================================
    THE THREE AREAS
    ------------------------------------------------------------
@@ -3993,6 +4246,77 @@ const AREAS = {
       a.solid(21 * T, 32 * T, 3 * T, T);
 
       a.exit(18, 0, 6, 0.8, 'street', 11, 15.5);
+    }
+  },
+
+  /* ---------- THE RABBIT PADDOCK ---------- */
+  /* Read the long note by the PADDOCK settings further up before
+     changing anything down here. There is deliberately no exit. */
+  paddock: {
+    label: 'The Paddock',
+    w: PADDOCK.cols, h: PADDOCK.rows,
+    build(a) {
+      const p = PADDOCK.pen;
+      a.fill('grass');
+
+      // a mown patch through the middle, so the pen reads as a
+      // place somebody looks after rather than a bare box
+      a.rect(10, 9, 9, 5, 'lawn');
+
+      /* The rails.
+
+         The two side runs go the FULL height, corner to corner,
+         overlapping the top and bottom runs at the ends. That
+         overlap matters. Run them from top+1 to bottom-1 instead,
+         so they merely meet the other two, and each corner is left
+         with a gap about twelve pixels tall where the side rail has
+         stopped and the end rail hasn't started. The test caught
+         exactly that at a low frame rate, with Henri wedged into the
+         corner post and held up by nothing but the next wall out.
+         Nobody actually escaped, but "held up by nothing but" is the
+         phrase this whole rework exists to avoid. */
+      a.fenceRow(p.left, p.right, p.top);
+      a.fenceRow(p.left, p.right, p.bottom);
+      a.fenceCol(p.left, p.top, p.bottom);
+      a.fenceCol(p.right, p.top, p.bottom);
+
+      /* Things to weave around. Without them a chase in a closed
+         pen is over in about three seconds, because a rabbit that
+         only ever runs straight away from Henri backs itself into
+         a wall almost immediately. These give it somewhere to
+         break off to, and give him something to cut around. The
+         middle is left clear, which is where the rabbit starts. */
+      a.prop('bush', 8.5, 8.0);
+      a.prop('bush', 20.5, 8.0);
+      a.prop('bush', 9.5, 14.0);
+      a.prop('bush', 19.5, 14.0);
+      a.prop('tree_c', 14.5, 7.0);
+      a.prop('bush', 14.5, 15.2);
+
+      /* The four holes. Marks on the ground, not gaps in the
+         rails: nothing about them is wired into collision at all.
+         What they do is checked in updateChaseRabbit. */
+      PADDOCK.holes.forEach(h => a.prop('rabbit_hole', h.col, h.row, { walkThrough: true }));
+
+      // a few trees outside the rails, so the pen looks like it
+      // sits somewhere rather than floating on a green sheet
+      a.prop('tree_b', 2.6, 6.5);
+      a.prop('tree_a', 27.4, 9);
+      a.prop('tree_c', 6, 20.5);
+      a.prop('tree_a', 23, 20.6);
+      a.prop('bush', 27.2, 15.5);
+      a.prop('bush', 2.8, 13.5);
+
+      // the boundary hedge, standing in for the rest of the field
+      a.hedgeRow(0, PADDOCK.cols - 1, 0);
+      a.hedgeRow(0, PADDOCK.cols - 1, 1);
+      a.hedgeRow(0, PADDOCK.cols - 1, PADDOCK.rows - 2);
+      a.hedgeRow(0, PADDOCK.cols - 1, PADDOCK.rows - 1);
+      a.hedgeCol(0, 2, PADDOCK.rows - 3); a.hedgeCol(1, 2, PADDOCK.rows - 3);
+      a.hedgeCol(PADDOCK.cols - 2, 2, PADDOCK.rows - 3);
+      a.hedgeCol(PADDOCK.cols - 1, 2, PADDOCK.rows - 3);
+
+      // no exits, on purpose
     }
   }
 };
@@ -4212,7 +4536,13 @@ class PrairieScene extends Phaser.Scene {
     this.henriChaseReady = false;
     this.henriChaseCooldown = pickChaseCooldown();
     this.chaseRabbits = [];
-    this.rabbitsHerded = 0;
+    this.rabbitCaught = false;
+    this.rabbitEscaped = false;
+    this.chaseReturn = null;
+    this.cueBush = null;        // the bush currently rustling, if any
+    this.cueBushAt = null;      // and where it stands
+    this.cueMarkTween = null;
+    this.cueBushTween = null;
 
     this.buildArt();
     this.buildPlayer();
@@ -4495,6 +4825,14 @@ class PrairieScene extends Phaser.Scene {
         this.makeTexture(pair[0], g.w, g.h, c => drawPixels(c, pair[1], ICON_PAL));
       });
 
+    /* The "!" that floats over a rustling bush. It borrows the
+       weather icons' palette on purpose: those two bright roles are
+       fixed colours rather than roles that follow the time of day,
+       so the mark stays just as easy to pick out against the grass
+       at dusk as it is at noon. */
+    const amsz = gridSize(ALERT_MARK);
+    this.makeTexture('alert_mark', amsz.w, amsz.h, c => drawPixels(c, ALERT_MARK, ICON_PAL));
+
     /* ---- Stage 4: the trees ----
        Straight through the same six roles as every other living
        thing. The two flowering species get their real blossom
@@ -4534,6 +4872,9 @@ class PrairieScene extends Phaser.Scene {
     const HOLE_PAL = { K: pal.K, m: pal.D, d: pal.E, e: pal.K, l: pal.L };
     const hsz = gridSize(T_HOLE);
     this.makeTexture('treehole', hsz.w, hsz.h, c => drawPixels(c, T_HOLE, HOLE_PAL));
+    // the rabbit-sized gaps in the paddock rails
+    const rhsz = gridSize(RABBIT_HOLE_ART);
+    this.makeTexture('rabbit_hole', rhsz.w, rhsz.h, c => drawPixels(c, RABBIT_HOLE_ART, HOLE_PAL));
     const qsz = gridSize(T_PLAQUE);
     this.makeTexture('plaque', qsz.w, qsz.h, c => drawPixels(c, T_PLAQUE, treePal));
 
@@ -4602,18 +4943,47 @@ class PrairieScene extends Phaser.Scene {
       S: lit(RABBIT_COLORS.S),
       f: lit('#e2a08f')
     };
-    [
+    /* All four rabbit pictures are drawn on ONE canvas size, with
+       each pose centred across it and sitting on the bottom edge.
+
+       This matters more than it looks. The four grids are naturally
+       different shapes: the sitting rabbit is tall and narrow, the
+       one hopping sideways is short and wide. Drawn at their own
+       sizes, the picture changed shape every time the rabbit
+       changed pose mid-hop, several times a second. Its solid box
+       is worked out from the picture's size and set up once, when
+       the rabbit is created, so from the first pose change onward
+       that box no longer sat where the rabbit appeared to be. The
+       gap is only a dozen pixels or so, but it is a dozen pixels of
+       "the fence stops something that isn't quite the rabbit", and
+       it drifts a different way for each pose.
+
+       That is almost certainly the original escape bug, and it is
+       worth knowing that the bigger spawn margins that were tried
+       against it could never have fixed it: the margin was covering
+       for a rabbit whose collision box wasn't under it.
+
+       One canvas size, so the box is right in every pose and stays
+       right. Baked in at CRITTER_SCALE, same as before, so the
+       rabbits aren't the one tiny thing in a world drawn 3x up. */
+    const rabbitPoses = [
       ['rabbit_hop_left', RABBIT_HOP_LEFT],
       ['rabbit_idle_left', RABBIT_IDLE_LEFT],
       ['rabbit_hop_down', RABBIT_HOP_DOWN],
       ['rabbit_hop_up', RABBIT_HOP_UP]
-    ].forEach(([key, rows]) => {
+    ];
+    let frameW = 0, frameH = 0;
+    rabbitPoses.forEach(([, rows]) => {
       const sz = gridSize(rows);
-      // The grids carry their own K outline, same as Henri. Baked
-      // in at CRITTER_SCALE too, so he isn't the one tiny thing in
-      // a world where everything else is drawn 3x up.
-      this.makeTexture(key, sz.w * CRITTER_SCALE, sz.h * CRITTER_SCALE,
-        c => drawRabbit(c, rows, rp, CRITTER_SCALE));
+      if (sz.w > frameW) frameW = sz.w;
+      if (sz.h > frameH) frameH = sz.h;
+    });
+    rabbitPoses.forEach(([key, rows]) => {
+      const sz = gridSize(rows);
+      const ox = Math.floor((frameW - sz.w) / 2) * CRITTER_SCALE;
+      const oy = (frameH - sz.h) * CRITTER_SCALE;      // stand it on the floor
+      this.makeTexture(key, frameW * CRITTER_SCALE, frameH * CRITTER_SCALE,
+        c => drawPixels(c, rows, rp, ox, oy, CRITTER_SCALE));
     });
   }
 
@@ -4650,6 +5020,10 @@ class PrairieScene extends Phaser.Scene {
        fading gets thrown away. */
     if (this.ghostTrees) this.ghostTrees.forEach(g => this.tweens.killTweensOf(g));
     this.ghostTrees = [];
+    /* The rustling bush, if one is going. Its tween has to be
+       stopped before the bush itself is thrown away just below,
+       or the shake is left running against nothing. */
+    this.hideBushCue();
     if (this.worldObjects) this.worldObjects.forEach(o => o.destroy());
     this.worldObjects = [];
     if (this.blockerCollider) { this.blockerCollider.destroy(); this.blockerCollider = null; }
@@ -4689,16 +5063,21 @@ class PrairieScene extends Phaser.Scene {
       const img = this.add.image(p.x, p.y, p.key).setScale(SCALE);
       if (p.mode === 'tile') {
         img.setOrigin(0, 0).setDepth(p.y + T - 8);
+      } else if (GROUND_MARKS[p.key]) {
+        /* A mark scuffed into the ground rather than a thing
+           standing on it, so it is always drawn underfoot instead
+           of taking its turn in the normal front-to-back order.
+           Just above the floor picture, below everything else. */
+        img.setOrigin(0.5, 1).setDepth(-5);
       } else {
         img.setOrigin(0.5, 1).setDepth(p.y);
-        /* Tall enough to swallow him whole? Then it's allowed to go
-           see-through while it's doing it. Deliberately just the big
-           oak for now — it's the one that actually loses him, and
-           getting the fade feeling right on one tree beats getting
-           it wrong on a dozen. The park's smaller trees and his own
-           planted ones join this line once the oak has been seen on
-           the iPad. */
-        if (p.key === 'oak') this.ghostTrees.push(img);
+        /* Is this a tree? Then it's allowed to go see-through while
+           it's standing on top of him. The list of what counts is
+           CANOPY_ART itself — anything with a measured outline is
+           in, anything without one is out — so the big oak and the
+           park's ordinary trees are covered and the bushes, benches,
+           mailboxes and houses are all left exactly as they were. */
+        if (CANOPY_ART[p.key]) this.ghostTrees.push(img);
       }
       this.worldObjects.push(img);
     });
@@ -4801,12 +5180,12 @@ class PrairieScene extends Phaser.Scene {
     // 'right' is the drawing unflipped — he has no forward-facing pose
     this.henriFacing = 'right';
 
-    // Stage 5 — the little sitting rabbit that signals "one's about,
-    // go tap Henri". Positioned wherever chaseZone() says whenever
-    // it's shown; a plain image, not a world prop, so it survives
-    // walking between areas without being torn down and rebuilt.
-    this.henriCue = this.add.image(0, 0, 'rabbit_idle_left')
-      .setOrigin(0.5, 1).setVisible(false);
+    /* The "!" that floats over a rustling bush. A plain image
+       rather than a world prop, so it survives walking between
+       areas without being torn down and rebuilt. Where it goes is
+       decided by showBushCue. */
+    this.cueMark = this.add.image(0, 0, 'alert_mark')
+      .setOrigin(0.5, 1).setScale(CUE_MARK_SCALE).setVisible(false);
   }
 
   /* ---------------------------------------------------------
@@ -5074,7 +5453,7 @@ class PrairieScene extends Phaser.Scene {
     // Stage 4: and if he's standing over a weed, out it comes.
     if (this.activeWeed >= 0) { this.pullWeed(this.activeWeed); return; }
     // Stage 5: and if Henri's right there with a rabbit about, off they go.
-    if (this.activeHenri) this.startRabbitChase();
+    if (this.activeBush) this.startRabbitChase();
   }
 
   resolveDirection(vx, vy) {
@@ -5154,27 +5533,53 @@ class PrairieScene extends Phaser.Scene {
        to water. */
     const nearP = this.nearestPlot();
     const nearT = this.nearestTreeSpot();
-    if (nearP >= 0 && nearT >= 0) {
-      const p = GARDEN_PLOTS[nearP];
-      const dp = Phaser.Math.Distance.Between(this.player.x, this.player.y,
-        p.col * T + PLOT_TILES_W * T / 2, p.row * T + T / 2);
-      const v = this.treeViews[nearT];
-      const dt = Phaser.Math.Distance.Between(this.player.x, this.player.y, v.x, v.y - 8);
-      this.activePlot = (dt < dp) ? -1 : nearP;
-      this.activeTree = (dt < dp) ? nearT : -1;
-    } else {
-      this.activePlot = nearP;
-      this.activeTree = nearT;
-    }
+    const dPlot = nearP >= 0
+      ? Phaser.Math.Distance.Between(this.player.x, this.player.y,
+          GARDEN_PLOTS[nearP].col * T + PLOT_TILES_W * T / 2,
+          GARDEN_PLOTS[nearP].row * T + T / 2)
+      : Infinity;
+    const dTree = nearT >= 0
+      ? Phaser.Math.Distance.Between(this.player.x, this.player.y,
+          this.treeViews[nearT].x, this.treeViews[nearT].y - 8)
+      : Infinity;
+    this.activePlot = (dPlot <= dTree) ? nearP : -1;
+    this.activeTree = (dTree < dPlot) ? nearT : -1;
+
     /* A weed only ever gets the button when there's nothing else
        to do with it. A bed and a tree are both bigger jobs than a
        weed, and a weed will still be there in two steps' time. */
     this.activeWeed = (this.activePlot < 0 && this.activeTree < 0) ? this.nearestWeed() : -1;
-    this.activeHenri = (this.activePlot < 0 && this.activeTree < 0 && this.activeWeed < 0)
-      ? this.nearestHenriForChase() : false;
+
+    /* And a rustling bush, which plays by the same closest-wins
+       rule rather than only getting the button when everything else
+       is out of range.
+
+       It has to. The backyard is small and a bush can easily stand
+       inside a bed's reach — walking up to one from the garden side
+       would offer to plant instead, and since that is the only way
+       to start the chase, the rabbit would sit there rustling
+       forever with no way to go and look at it. Closest-wins means
+       walking right up to the bush always offers the rabbit, and
+       standing at the bed still offers the bed. */
+    this.activeBush = false;
+    const dBush = this.bushCueDistance();
+    if (dBush >= 0) {
+      let rival = Math.min(dPlot, dTree);
+      if (this.activeWeed >= 0) {
+        const w = this.weedViews[this.activeWeed];
+        rival = Math.min(rival,
+          Phaser.Math.Distance.Between(this.player.x, this.player.y, w.x, w.y));
+      }
+      if (dBush < rival) {
+        this.activePlot = -1;
+        this.activeTree = -1;
+        this.activeWeed = -1;
+        this.activeBush = true;
+      }
+    }
     this.updatePlotHint();
     this.stepRain(delta);
-    this.updateHenriCue(delta);
+    this.updateBushCue(delta);
   }
 
   checkSigns() {
@@ -5343,7 +5748,7 @@ class PrairieScene extends Phaser.Scene {
     const atBed = !!verb;                 // is this a garden bed, or a tree?
     if (!verb && this.activeTree >= 0) verb = this.treeVerb(this.activeTree);
     if (!verb && this.activeWeed >= 0) verb = 'PULL';
-    if (!verb && this.activeHenri) verb = 'CHASE!';
+    if (!verb && this.activeBush) verb = 'INVESTIGATE';
 
     /* Which little picture belongs on the button, if any. Watering
        is watering whether it's a bed or a sapling, so the can shows
@@ -5365,12 +5770,12 @@ class PrairieScene extends Phaser.Scene {
     this.actionHint.setVisible(!verb);
 
     /* Stage 5, after playtesting: a word quietly changing on a
-       button was too easy to miss entirely. CHASE! now gets its
+       button was too easy to miss entirely. The chase verb gets its
        own warm color and a steady pulse, on top of the text, so
        there's something moving to catch the eye even if he isn't
        looking straight at the button. */
     if (this.actionPulseTween) { this.actionPulseTween.stop(); this.actionPulseTween = null; }
-    if (verb === 'CHASE!') {
+    if (verb === 'INVESTIGATE') {
       this.actionRing.setFillStyle(0xffe27a, 0.32).setStrokeStyle(3, 0xffe27a, 0.95);
       this.actionLabel.setColor('#3a2a10');
       this.actionRing.setScale(1);
@@ -5397,6 +5802,16 @@ class PrairieScene extends Phaser.Scene {
     } else {
       this.actionIcon.setVisible(false);
       this.actionLabel.setFontSize(15).setPosition(this.actionX, this.actionY);
+    }
+
+    /* INVESTIGATE is a longer word than any verb before it and runs
+       wider than the button it sits in. Rather than a special case
+       for one word, anything too wide is simply shrunk to fit,
+       which covers whatever gets added later too. */
+    this.actionLabel.setScale(1);
+    const ROOM = 80;
+    if (this.actionLabel.width > ROOM) {
+      this.actionLabel.setScale(ROOM / this.actionLabel.width);
     }
   }
 
@@ -5499,6 +5914,20 @@ class PrairieScene extends Phaser.Scene {
     const z = this.add.zone(bx + blk[0] / 2, by + blk[1] / 2, blk[0], blk[1]);
     this.blockers.add(z);
     z.body.updateFromGameObject();
+
+    /* And it joins the trees allowed to go see-through when he's
+       lost behind one. Only the tree itself — the ring of earth
+       lies flat on the ground beneath everyone's feet and the
+       plaque is knee-high, so neither can hide anybody.
+
+       Nothing is said here about how tall it is. A tree he plants
+       today is a stick and couldn't hide a rabbit; the same tree in
+       a few weeks is a full-grown sycamore, taller than his house
+       is wide. The check looks at whichever drawing the tree is
+       actually wearing at that moment, so it simply starts
+       mattering as the tree grows into it, with nothing to
+       remember and nothing to update. */
+    this.ghostTrees.push(tree);
 
     this.treeViews.push({ id: t.id, x: t.x, y: t.y, hole, tree, plaque, zone: z });
     return this.treeViews[this.treeViews.length - 1];
@@ -5638,10 +6067,16 @@ class PrairieScene extends Phaser.Scene {
     const trees = this.ghostTrees;
     if (!trees || !trees.length) return;
 
-    /* Who we're trying to keep in sight. Henri joins this list in
-       the next pass, once the fade has been seen on the iPad. */
+    /* Who we're trying to keep in sight. Henri counts as much as
+       Mike does — he trails a good tile behind, so he wanders into
+       a canopy well after Mike has and out of it well after too,
+       and a fade that only watched Mike would drop him back to
+       solid with the dog still lost under it. Either of them being
+       covered is enough; the tree doesn't fade twice as hard for
+       two of them. */
     const folk = [];
     if (this.player && this.player.visible) folk.push(this.player);
+    if (this.henri && this.henri.visible) folk.push(this.henri);
     if (!folk.length) return;
 
     for (let i = 0; i < trees.length; i++) {
@@ -6501,7 +6936,7 @@ class PrairieScene extends Phaser.Scene {
      for a few seconds, then gets out of the way. */
   toast(text, ms) {
     this.showMessage(text);
-    this.toastUntil = this.time.now + (ms || 2600);
+    this.toastUntil = this.time.now + (ms || 2600) + MESSAGE_HOLD_BONUS;
   }
 
   /* ---- what the weather looks like -------------------------
@@ -6637,101 +7072,212 @@ class PrairieScene extends Phaser.Scene {
   }
 
   /* ---------------------------------------------------------
-     STAGE 5 — THE RABBIT CHASE
+     THE RABBIT CHASE
      ------------------------------------------------------------
-     Henri's own mini-game. A rabbit "appears" (the idle cue
-     sprite, near the middle of the open lawn) every so often
-     while he's puttering in the backyard; standing near Henri and
-     pressing the one action button sends him off after it. For
-     the length of the chase, the joystick drives Henri directly
-     instead of following — three rabbits spawn, flee whenever
-     he's close, and count as "herded off" the moment they're
-     pushed past the edge of the play patch. Nothing here is saved
-     — it's a live bit of fun, not a system, and it can be played
-     again as soon as the cooldown clears.
+     Henri's own mini-game, rebuilt around the paddock.
+
+     A rabbit turns up in the backyard every so often while he's
+     puttering about. Setting off after it takes the pair of them
+     into the paddock, a small fenced pen that is its own place on
+     the map and exists for nothing else. For as long as the chase
+     lasts the joystick drives Henri directly instead of having him
+     follow, and Mike jogs along behind him.
+
+     One rabbit. It sits tight until Henri gets close, then bolts
+     straight away from him. Henri wins by running it down. If it
+     reaches one of the four holes in the corners first it is gone,
+     and so is the chase. Either way the clock is only a backstop.
+
+     Nothing here is saved. It's a live bit of fun, not a system,
+     and it can be played again as soon as the cooldown clears.
      --------------------------------------------------------- */
 
-  /* The open part of the fenced backyard lawn — inside the fence
-     line on every side (the fence itself sits at col 4, col 31,
-     and row 2). yMax is deliberately well short of the fence,
-     though: the house is one tall image, depth-sorted by its
-     base at row 21, and its roof peak actually reaches all the
-     way up to row 14 (checked directly against the art: 112 rows
-     tall, 3x scale, anchored at row 21 → 336px tall → top edge at
-     row 21 - 7 = row 14). Anyone standing anywhere in that band,
-     even well out in the open yard, gets drawn behind the whole
-     house rather than in front of it — normally a nice touch (you
-     can duck behind a roofline the same as a tree), but during a
-     fast-moving chase it meant losing track of everyone for long
-     stretches. Row 12.5 keeps a buffer clear of it. Henri and
-     Mike also get a hard stop at yMax during the chase (see
-     updateChase/updateMikeChase) rather than relying on collision
-     alone to keep them out of that band. */
+  /* The open grass inside the paddock rails. This used to be the
+     thing keeping everyone in bounds, which is exactly why it kept
+     failing. It isn't any more: the fence and the world bounds do
+     that now, on their own, and this is only consulted to decide
+     where a rabbit is allowed to appear. See the long note by the
+     PADDOCK settings up top. */
   chaseZone() {
-    return { xMin: 5.5 * T, xMax: 29.5 * T, yMin: 3.5 * T, yMax: 12.5 * T };
+    return PADDOCK.zone;
   }
 
-  /* Counts down while he's puttering in the backyard; when it
-     runs out, the cue rabbit appears and stays until he starts
-     the chase (or leaves the yard, which just pauses the clock
-     rather than cancelling it).
+  /* Counts down while he's puttering in the backyard; when it runs
+     out, one of the bushes starts rustling with a "!" over it, and
+     keeps rustling until he goes and looks (or leaves the yard,
+     which just pauses the clock rather than cancelling it).
 
-     Revised after playtesting: the cue used to appear at a fixed
-     spot in the yard, which meant it was easy to never walk past
-     it at all. It now appears right next to wherever Henri
-     already is — since Henri is almost always near him — plus a
-     one-time announcement and a gentle continuous bounce, so
-     there's no missing that something's happening. */
-  updateHenriCue(delta) {
+     This used to be a small rabbit that appeared beside Henri, and
+     pressing the button anywhere near Henri set him off. The cue
+     is the same idea — something appears, pulses gently, and goes
+     away once it has been acted on — but pointed at a bush, which
+     is both a better hiding place for a rabbit and a thing he has
+     to walk over to rather than something already at his heel. */
+  updateBushCue(delta) {
     if (!RABBIT_CHASE_ENABLED) return; // minigame paused — see the note by RABBIT_CHASE_ENABLED up top
     if (this.areaKey !== 'home' || this.chaseActive) {
-      if (this.henriCue.visible) this.hideHenriCue();
+      if (this.cueMark.visible) this.hideBushCue();
       return;
     }
     if (this.henriChaseReady) {
-      // Keep it pinned near Henri — he may well have wandered
-      // since the moment it appeared.
-      this.henriCue.setPosition(this.henri.x - 24, this.henri.y).setDepth(this.henri.y + 1);
+      /* Already rustling. If the bush itself has gone, he has been
+         out of the yard and back, and the whole yard was rebuilt on
+         the way in — so the mark goes back on the same bush rather
+         than the moment being lost. */
+      if (!this.cueBush || !this.cueBush.active) this.showBushCue(this.cueBushAt);
       return;
     }
     this.henriChaseCooldown -= delta;
     if (this.henriChaseCooldown <= 0) {
       this.henriChaseReady = true;
-      this.henriCue
-        .setPosition(this.henri.x - 24, this.henri.y)
-        .setDepth(this.henri.y + 1)
-        .setScale(1).setVisible(true);
-      this.henriCueTween = this.tweens.add({
-        targets: this.henriCue,
-        scale: { from: 1, to: 1.18 },
-        duration: 480,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.InOut'
-      });
-      this.toast("A rabbit's in the yard — walk up to Henri and tap the button!", 3400);
+      this.showBushCue(this.pickCueBush());
+      this.toast("Something's rustling in the bushes.", 3400);
     }
   }
 
-  hideHenriCue() {
-    if (this.henriCueTween) { this.henriCueTween.stop(); this.henriCueTween = null; }
-    this.henriCue.setScale(1).setVisible(false);
+  /* Which bush this time. The fixed list is already clear of the
+     garden beds, but he can plant a tree anywhere he likes, and a
+     tree standing next to a bush would take the button and leave
+     the rabbit permanently un-investigable. So anything he has
+     planted too close is ruled out at the moment of choosing.
+
+     If he has somehow managed to crowd every last bush, the list
+     is used as-is rather than skipping the rabbit altogether: a
+     cue that is briefly awkward to reach beats no cue at all. */
+  pickCueBush() {
+    const spots = CUE_BUSHES.map(b => ({ x: b.col * T, y: b.row * T }));
+    const clear = spots.filter(at => {
+      for (const v of (this.treeViews || [])) {
+        if (Phaser.Math.Distance.Between(at.x, at.y, v.x, v.y - 8) < CUE_CLEARANCE) return false;
+      }
+      return true;
+    });
+    const from = clear.length ? clear : spots;
+    return from[Math.floor(Math.random() * from.length)];
   }
 
-  /* Is he standing close enough to Henri, with a rabbit about,
-     to have the action button start the chase? */
-  nearestHenriForChase() {
-    if (this.areaKey !== 'home' || this.chaseActive || !this.henriChaseReady) return false;
-    return Phaser.Math.Distance.Between(this.player.x, this.player.y, this.henri.x, this.henri.y) < 72;
+  /* Find a piece of scenery already standing in the area by what it
+     is and where it is. The bushes are built as ordinary props like
+     everything else, so this is how the cue gets hold of the one it
+     wants in order to shake it. */
+  findProp(key, x, y) {
+    return (this.worldObjects || []).find(o =>
+      o.active && o.texture && o.texture.key === key &&
+      Math.abs(o.x - x) < 1 && Math.abs(o.y - y) < 1) || null;
   }
 
+  showBushCue(at) {
+    if (!at) return;
+    this.hideBushCue();
+    this.cueBushAt = at;
+
+    const bush = this.findProp('bush', at.x, at.y);
+    this.cueBush = bush;
+
+    /* The mark floats just clear of the top of the bush. Measured
+       off the picture rather than typed in, so it still sits right
+       if the bush art is ever changed. */
+    const top = bush ? bush.y - bush.displayHeight : at.y - 44;
+    /* Drawn a little ahead of the bush in the front-to-back order,
+       by enough that somebody standing right at the bush doesn't
+       cover the mark with his head, but not so much that it starts
+       showing through the house from across the yard. */
+    this.cueMark
+      .setPosition(at.x, top - 6)
+      .setDepth(at.y + 60)
+      .setScale(CUE_MARK_SCALE).setVisible(true);
+
+    /* The pulse is written around CUE_MARK_SCALE rather than around
+       1. The mark is pixel art drawn small and shown three times
+       bigger, like everything else in the world, so a tween that
+       ran from 1 to 1.1 would quietly shrink it to a third of its
+       size the moment the cue appeared. */
+    this.cueMarkTween = this.tweens.add({
+      targets: this.cueMark,
+      y: { from: top - 6, to: top - 15 },
+      scale: { from: CUE_MARK_SCALE, to: CUE_MARK_SCALE * 1.1 },
+      duration: 460, yoyo: true, repeat: -1, ease: 'Sine.InOut'
+    });
+
+    /* And the bush itself rocks. It is drawn from the middle of its
+       base, so rotating it tips it side to side about its own roots
+       rather than spinning it, which reads as something moving
+       around inside it. Small and quick: this is a rustle, not a
+       tree in a gale. */
+    if (bush) {
+      bush.setAngle(0);
+      this.cueBushTween = this.tweens.add({
+        targets: bush,
+        angle: { from: -2.5, to: 2.5 },
+        duration: 220, yoyo: true, repeat: -1, ease: 'Sine.InOut'
+      });
+    }
+  }
+
+  /* Stops the rustling and puts the bush back upright. Safe to call
+     at any time, including when there is no cue and when the bush
+     it was pointing at has already been thrown away — which is why
+     entering an area calls it before clearing out the scenery. */
+  hideBushCue() {
+    if (this.cueMarkTween) { this.cueMarkTween.stop(); this.cueMarkTween = null; }
+    if (this.cueBushTween) { this.cueBushTween.stop(); this.cueBushTween = null; }
+    if (this.cueBush && this.cueBush.active) this.cueBush.setAngle(0);
+    this.cueBush = null;
+    if (this.cueMark) this.cueMark.setScale(CUE_MARK_SCALE).setVisible(false);
+  }
+
+  /* How far he is from the rustling bush, or -1 if there isn't one
+     or he is nowhere near it. A distance rather than a yes/no,
+     because it has to be compared against the beds and the trees to
+     work out which of them the button belongs to. */
+  bushCueDistance() {
+    if (this.areaKey !== 'home' || this.chaseActive) return -1;
+    if (!this.henriChaseReady || !this.cueBushAt) return -1;
+    const d = Phaser.Math.Distance.Between(
+      this.player.x, this.player.y, this.cueBushAt.x, this.cueBushAt.y);
+    return d < CUE_REACH ? d : -1;
+  }
+
+  /* Setting off after the rabbit. This no longer starts the chase
+     where he's standing: it takes everyone to the paddock first,
+     behind the same short fade the doorways between areas use, and
+     the chase proper begins once they've arrived.
+
+     Where he was standing in the yard is remembered here so that
+     when it's over he's put back on exactly the same patch of
+     grass, rather than at a fixed spawn point by the gate. */
   startRabbitChase() {
+    /* Starting a chase while one is already running would swap the
+       paddock out from under the rabbit that's in it and leave its
+       collision pointing at scenery that no longer exists, which
+       stops the game dead. Nothing in normal play can do this (the
+       action button stands down for the duration), but it is one
+       line to make it impossible rather than merely unreachable. */
+    if (this.transitioning || this.chaseActive) return;
+    this.henriChaseReady = false;
+    this.hideBushCue();
+    this.chaseReturn = { area: this.areaKey, x: this.player.x, y: this.player.y };
+
+    this.transitioning = true;
+    this.player.body.setVelocity(0, 0);
+    this.cameras.main.fadeOut(180, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.enterArea('paddock', PADDOCK.spawn.col * T, PADDOCK.spawn.row * T);
+      this.beginChaseInPaddock();
+      this.cameras.main.fadeIn(220, 0, 0, 0);
+      this.time.delayedCall(230, () => { this.transitioning = false; });
+    });
+  }
+
+  /* Everything that used to be startRabbitChase, minus the parts
+     about the cue, and now running inside the paddock rather than
+     in the middle of the backyard. */
+  beginChaseInPaddock() {
     this.chaseActive = true;
     this.updatePlantButton();   // the chase gets the whole screen
-    this.henriChaseReady = false;
-    this.hideHenriCue();
-    this.chaseTimeLeft = 45000;   // shortened from 75s after playtesting — more of a challenge
-    this.rabbitsHerded = 0;
+    this.chaseTimeLeft = PADDOCK.roundSeconds * 1000;   // a backstop, not the main way it ends
+    this.rabbitCaught = false;
+    this.rabbitEscaped = false;
 
     // The action button plays no part during the chase — the whole
     // screen is movement for Henri now — so it stands down rather
@@ -6743,14 +7289,18 @@ class PrairieScene extends Phaser.Scene {
     this.actionHint.setVisible(false);
     this.actionVerbShown = null;
 
-    /* Fixed after playtesting: everyone — him, Henri, the rabbits —
-       was ignoring the garden beds, trees, bench and house during
-       the chase, which felt wrong given they all respect those the
-       rest of the time. Mike's own collider (already set up for
-       normal play) just needed to stay switched on. Henri and each
-       rabbit get a physics body of their own, for the length of the
-       chase only, with a collider against the same `this.blockers`
-       everything else in the yard already bumps into. */
+    /* Everyone in the pen runs on a real physics body, and every
+       one of those bodies is held in twice over: a collider against
+       `this.blockers` (which in the paddock is the fence itself,
+       plus the bushes and the little tree) AND collideWorldBounds,
+       which in the paddock is the same line as the fence because
+       the rails sit on the outermost squares of the map.
+
+       That doubling is the point of the rework. The old chase kept
+       everyone in with an invisible rectangle and a generous spawn
+       margin, and rabbits still got out. Nothing here relies on a
+       margin, or on a check running in time, or on anything being
+       tuned correctly. There is simply nowhere else to be. */
     if (!this.henri.body) {
       this.physics.add.existing(this.henri);
       // Same little 28x14 box under his feet as always — but its
@@ -6765,40 +7315,29 @@ class PrairieScene extends Phaser.Scene {
     }
     this.henriChaseCollider = this.physics.add.collider(this.henri, this.blockers);
 
+    /* One rabbit now, not three.
+
+       It goes in the far half of the pen from where Henri and Mike
+       come in, well away from any of the four corners, so it starts
+       with room in every direction and can't be a step from a hole
+       before he's even taken his thumb off the button. Because the
+       paddock is one known, fixed shape, this is a much simpler
+       sum than the old one: there's no working out where in a big
+       shared yard the chase happens to have started. */
     const z = this.chaseZone();
-    // Scattered near wherever Henri already is, not flung across
-    // the whole (now much bigger) yard — so the chase starts right
-    // away instead of him hunting for them first.
-    //
-    // Fixed Aug 7: starting the chase wherever the player happens to
-    // be is the right call, but it means Henri can just as easily be
-    // standing right up against the fence as out in the open. The
-    // old spawn scattered rabbits in a full circle around him and
-    // only clamped them 20px in from the edge afterward — right up
-    // against the fence, that's no running room at all, and since
-    // rabbits flee straight away from Henri, "away" often pointed
-    // straight out of bounds. They'd cross the escape line within a
-    // fraction of a second and just seem to vanish.
-    //
-    // Now they fan out in a wide cone pointed toward the middle of
-    // the yard (wherever that is relative to Henri, not a fixed
-    // direction) rather than scattering all the way around him, and
-    // the clamp margin is much bigger. So no matter which corner of
-    // the yard the chase starts in, every rabbit spawns with real
-    // room to run before it's anywhere near "escaped."
-    const zCenterX = (z.xMin + z.xMax) / 2, zCenterY = (z.yMin + z.yMax) / 2;
-    const toYardCenter = Math.atan2(zCenterY - this.henri.y, zCenterX - this.henri.x);
-    const SPAWN_MARGIN = 65; // was 20 — real running room before the escape line
+    const SPAWN_INSET = 110;   // clear of every wall, and of every hole
+    const x = Phaser.Math.Between(z.xMin + SPAWN_INSET, z.xMax - SPAWN_INSET);
+    const y = Phaser.Math.Between(z.yMin + SPAWN_INSET, z.yMin + (z.yMax - z.yMin) * 0.45);
     this.chaseRabbits = [];
-    for (let i = 0; i < 3; i++) {
-      const a = toYardCenter + (i - 1) * (Math.PI / 3) + (Math.random() - 0.5) * 0.5;
-      const d = 110 + Math.random() * 130;
-      const x = Phaser.Math.Clamp(this.henri.x + Math.cos(a) * d, z.xMin + SPAWN_MARGIN, z.xMax - SPAWN_MARGIN);
-      const y = Phaser.Math.Clamp(this.henri.y + Math.sin(a) * d, z.yMin + SPAWN_MARGIN, z.yMax - SPAWN_MARGIN);
+    {
       const shadow = this.add.ellipse(x, y - 1, 15 * CRITTER_SCALE, 6 * CRITTER_SCALE, 0x1d2b16, 0.22);
       const spr = this.add.image(x, y, 'rabbit_idle_left').setOrigin(0.5, 1);
       this.physics.add.existing(spr);
       spr.body.setSize(18, 12).setOffset((spr.width - 18) / 2, spr.height - 14);
+      // held in by the fence and by the edge of the world, the same
+      // as Henri and Mike. The holes are not a way through any of
+      // that; see updateChaseRabbit.
+      spr.body.setCollideWorldBounds(true);
       const collider = this.physics.add.collider(spr, this.blockers);
       this.chaseRabbits.push({ spr, shadow, collider, wanderT: 0, wvx: 0, wvy: 0 });
     }
@@ -6810,6 +7349,7 @@ class PrairieScene extends Phaser.Scene {
     // exact same trail-and-lag trick that normally has Henri follow
     // Mike, just pointed the other way (see updateMikeChase below).
     this.mikeTrail = [];
+    this.mikeChaseWalking = false;   // see the hysteresis note in updateMikeChase
 
     // The camera was only ever following him — for the length of
     // the chase it follows Henri instead, so the view actually
@@ -6820,7 +7360,7 @@ class PrairieScene extends Phaser.Scene {
     this.updateChaseHUD();
     this.chaseBox.setVisible(true);
     this.chaseText.setVisible(true);
-    this.toast("Henri's off! Herd all three rabbits out of the yard.", 2800);
+    this.toast("Henri's off! Run the rabbit down before it finds a hole.", 3000);
   }
 
   /* Runs instead of the normal update() body for as long as the
@@ -6833,11 +7373,10 @@ class PrairieScene extends Phaser.Scene {
     else if (this.keys.down.isDown || this.wasd.S.isDown) vy = 1;
     const dir = this.resolveDirection(vx, vy);
 
-    // Driven by his own physics body now (see startRabbitChase),
-    // so the real fence and the garden beds/trees/bench actually
-    // stop him, the same as they do the rest of the time — no more
-    // hand-rolled rectangle standing in for the yard's real edges.
-    const speed = 210;
+    // Driven by his own physics body, so the paddock fence, the
+    // bushes and the little tree all actually stop him, the same as
+    // everything does the rest of the time.
+    const speed = PADDOCK.henriSpeed;
     this.henri.body.setVelocity(dir.x * speed, dir.y * speed);
 
     const moving = dir.x !== 0 || dir.y !== 0;
@@ -6855,11 +7394,12 @@ class PrairieScene extends Phaser.Scene {
       this.henri.setFrame('sideSit');
     }
 
-    // Hard stop at the house-avoidance line — see the long note on
-    // chaseZone() above. Collision keeps him out of the beds/trees/
-    // bench/fence; this keeps him out of the one band where he'd
-    // vanish behind the house's roof.
-    this.henri.y = Math.min(this.henri.y, this.chaseZone().yMax);
+    /* The old chase clamped Henri's y here to keep him out of the
+       band where the house's roof would have drawn over the top of
+       him. There is no house in the paddock, and nothing else to
+       hide behind, so that clamp is gone. The fence and the edge of
+       the world are the only things holding him now, which is the
+       whole idea. */
 
     this.henri.setDepth(this.henri.y);
     this.henriShadow.setPosition(this.henri.x, this.henri.y - 1).setDepth(this.henri.y - 1);
@@ -6867,13 +7407,27 @@ class PrairieScene extends Phaser.Scene {
     this.updateMikeChase(delta);
 
     this.chaseRabbits.forEach(r => this.updateChaseRabbit(r, delta));
-    this.chaseRabbits = this.chaseRabbits.filter(r => !r.escaped);
+    this.chaseRabbits = this.chaseRabbits.filter(r => !r.gone);
 
     this.chaseTimeLeft -= delta;
     this.updateChaseHUD();
 
-    if (this.rabbitsHerded >= 3) { this.endChase(true); return; }
-    if (this.chaseTimeLeft <= 0) { this.endChase(false); return; }
+    /* Three ways it can finish, and none of them punish him.
+
+       Caught. In a pen with no edge to push anything across, the
+       old "herded past the boundary" test had nowhere left to
+       point, so winning is Henri actually running the rabbit down.
+       Down a hole. Set by updateChaseRabbit when a fleeing rabbit
+       reaches a corner. Out of time. The backstop. */
+    if (this.rabbitEscaped) { this.endChase(false, 'hole'); return; }
+    if (this.chaseTimeLeft <= 0) { this.endChase(false, 'time'); return; }
+
+    const r = this.chaseRabbits[0];
+    if (r && Phaser.Math.Distance.Between(
+          this.henri.x, this.henri.y, r.spr.x, r.spr.y) < PADDOCK.catchReach) {
+      this.endChase(true);
+      return;
+    }
   }
 
   /* Nice-to-have, added Aug 6: Mike jogging along behind Henri
@@ -6916,31 +7470,50 @@ class PrairieScene extends Phaser.Scene {
 
     const dx = target.x - this.player.x, dy = target.y - this.player.y;
     const dist = Math.hypot(dx, dy);
-    const MIKE_CHASE_SPEED = 230;
+    const MIKE_CHASE_SPEED = PADDOCK.mikeSpeed;
 
-    /* Fixed after playtesting: this used to pick his facing straight
-       off the raw dx/dy toward the lag target, which — unlike every
-       other bit of movement in the game — was never snapped to a
-       compass direction first. A "chase a moving point" vector is
-       noisy frame to frame, so near a diagonal it would flicker
-       between two walk animations rather than settling on one.
-       Running it through the same 8-direction snap the joystick
-       itself uses fixes that. It also now moves through his normal
-       physics body (setVelocity, not a manual teleport each frame),
-       so the fences/beds/trees block him again during the chase,
-       same as they do the rest of the time. */
+    /* His facing and his walk cycle, both of which used to glitch.
+
+       Two separate causes, and they made each other worse.
+
+       ONE: he stopped and started constantly. He is chasing a point
+       that trails a set distance behind Henri, so when Henri slows
+       or turns, that point catches him up and the distance to it
+       drops below the "close enough, stand still" line — then rises
+       above it, then below, several times a second. Each crossing
+       started or stopped the walk cycle, which reads as a stutter.
+       Now it takes a clear 11 pixels to set him walking and he
+       keeps walking until he is within 4, so the two thresholds
+       can't chatter against each other.
+
+       TWO: his facing flipped between sideways and forwards. The
+       direction is snapped to one of eight compass points, and the
+       old test picked left/right only when the horizontal part was
+       the larger. On a diagonal the two parts are equal, so it fell
+       through to up/down — and a noisy "chase a moving point"
+       vector wobbles across that boundary constantly. Walking
+       roughly, but not exactly, sideways therefore flickered
+       between the side and front poses every few frames. He now
+       only turns when one axis clearly beats the other, and holds
+       whatever he was facing when it's close, so a near-diagonal
+       settles instead of arguing with itself. */
+    const START_WALKING = 11, STOP_WALKING = 4;
     let moving = false;
-    if (dist > 3) {
+    if (dist > (this.mikeChaseWalking ? STOP_WALKING : START_WALKING)) {
       const dir = this.resolveDirection(dx, dy);
       this.player.body.setVelocity(dir.x * MIKE_CHASE_SPEED, dir.y * MIKE_CHASE_SPEED);
       moving = dir.x !== 0 || dir.y !== 0;
       if (moving) {
-        if (Math.abs(dir.x) > Math.abs(dir.y)) this.facing = dir.x > 0 ? 'right' : 'left';
-        else this.facing = dir.y > 0 ? 'down' : 'up';
+        const ax = Math.abs(dir.x), ay = Math.abs(dir.y);
+        const CLEARLY = 1.3;
+        if (ax > ay * CLEARLY) this.facing = dir.x > 0 ? 'right' : 'left';
+        else if (ay > ax * CLEARLY) this.facing = dir.y > 0 ? 'down' : 'up';
+        // too close to call: keep facing whichever way he already was
       }
     } else {
       this.player.body.setVelocity(0, 0);
     }
+    this.mikeChaseWalking = moving;
 
     if (moving) {
       const anim = 'walk-' + this.facing;
@@ -6951,30 +7524,87 @@ class PrairieScene extends Phaser.Scene {
       this.player.setFrame(this.facing + '0');
     }
 
-    // Same house-avoidance line Henri gets — see chaseZone().
-    this.player.y = Math.min(this.player.y, this.chaseZone().yMax);
+    // The house-avoidance clamp Henri used to get was here too, and
+    // is gone for the same reason: there's no house in the paddock,
+    // and the fence and world bounds hold him without help.
 
     this.player.setDepth(this.player.y);
     this.shadow.setPosition(this.player.x, this.player.y - 3).setDepth(this.player.y - 1);
   }
 
-  /* One rabbit's thinking, every frame: sit tight until Henri
-     gets close, then bolt straight away from him. The moment it
-     crosses out of the play patch, it's counted as herded off —
-     no separate "catch" step, since chasing IS the herding. */
+  /* The rabbit's thinking, every frame: sit tight until Henri gets
+     close, then bolt straight away from him. Unchanged from the old
+     three-rabbit chase, which is the point — this behaviour was
+     never what was broken.
+
+     What has changed is what happens at the edges. It used to be
+     that leaving the play patch WAS the win: crossing that line
+     counted as herded off. In a sealed pen there is no line to
+     cross, and the rabbit couldn't cross it if there were. So the
+     edges now do the opposite job. Cornered against a wall with a
+     hole in reach, a fleeing rabbit takes it and the chase is over,
+     which is the one thing a rabbit backed into a corner would
+     obviously do.
+
+     Two guards on that, both deliberate:
+
+     - it only counts while the rabbit is actually fleeing. A rabbit
+       pottering about on its own can wander right over a hole and
+       nothing happens. Losing the chase should always be something
+       Henri drove it to, never something that just occurred.
+     - the rabbit never aims for a hole. It runs from Henri and
+       nothing else. Whether it finds a corner is down to which way
+       he came at it. */
   updateChaseRabbit(r, delta) {
-    const z = this.chaseZone();
-    // r.spr.x/y is now the one true position — his physics body
-    // resolves it against the fences/beds/trees each step, so
-    // there's no separate tracked x/y to keep in sync with it.
+    // r.spr.x/y is the one true position — its physics body resolves
+    // it against the fence and the bushes each step, so there's no
+    // separate tracked x/y to keep in sync with it.
     const dx = r.spr.x - this.henri.x, dy = r.spr.y - this.henri.y;
     const dist = Math.hypot(dx, dy);
-    const FLEE_RADIUS = 150;
+    const FLEE_RADIUS = PADDOCK.rabbitFleeRadius;
     let vx = 0, vy = 0, speed;
 
     if (dist < FLEE_RADIUS && dist > 0.01) {
-      vx = dx / dist; vy = dy / dist;
-      speed = 155;
+      /* Running. Three pulls mixed together, described in full up
+         at the PADDOCK settings. */
+      const ax = dx / dist, ay = dy / dist;         // away from Henri
+
+      /* Which way it's leaning this second. Flipping the lean every
+         second or so is what makes it jink instead of sailing round
+         in one predictable circle. */
+      if (r.lean === undefined) r.lean = Math.random() < 0.5 ? -1 : 1;
+      r.leanT = (r.leanT || 0) - delta;
+      if (r.leanT <= 0) {
+        r.leanT = 800 + Math.random() * 1000;
+        r.lean = -r.lean;
+      }
+      const cx = -ay * r.lean, cy = ax * r.lean;    // sideways, at right angles
+
+      /* How panicked it is: 0 out at the edge of the flee radius,
+         1 when Henri is right on top of it. Wall-shyness is scaled
+         by the inverse, so a rabbit with room to spare keeps well
+         clear of the rails, and a cornered one stops caring and
+         takes the hole. */
+      const span = Math.max(1, FLEE_RADIUS - PADDOCK.catchReach);
+      const panic = 1 - Phaser.Math.Clamp((dist - PADDOCK.catchReach) / span, 0, 1);
+
+      let wx = 0, wy = 0;
+      const rails = PADDOCK.rails, feel = PADDOCK.wallFeel;
+      const near = (gap, px, py) => {
+        if (gap < feel) { const s = 1 - gap / feel; wx += px * s; wy += py * s; }
+      };
+      near(r.spr.x - rails.xMin, 1, 0);      // left rail, push right
+      near(rails.xMax - r.spr.x, -1, 0);     // right rail, push left
+      near(r.spr.y - rails.yMin, 0, 1);      // top rail, push down
+      near(rails.yMax - r.spr.y, 0, -1);     // bottom rail, push up
+      const wallW = PADDOCK.wallShy * (1 - panic);
+
+      vx = ax * PADDOCK.fleeAway + cx * PADDOCK.fleeCurve + wx * wallW;
+      vy = ay * PADDOCK.fleeAway + cy * PADDOCK.fleeCurve + wy * wallW;
+      const m = Math.hypot(vx, vy);
+      if (m > 0.001) { vx /= m; vy /= m; } else { vx = ax; vy = ay; }
+
+      speed = PADDOCK.rabbitSpeed;
       r.wanderT = 0;
     } else {
       r.wanderT -= delta;
@@ -6987,7 +7617,7 @@ class PrairieScene extends Phaser.Scene {
         }
       }
       vx = r.wvx; vy = r.wvy;
-      speed = 45;
+      speed = PADDOCK.rabbitWanderSpeed;
     }
 
     r.spr.body.setVelocity(vx * speed, vy * speed);
@@ -7004,15 +7634,24 @@ class PrairieScene extends Phaser.Scene {
     r.shadow.setPosition(r.spr.x, r.spr.y - 1).setDepth(r.spr.y - 1);
     r.spr.setDepth(r.spr.y);
 
-    if (r.spr.x < z.xMin || r.spr.x > z.xMax || r.spr.y < z.yMin || r.spr.y > z.yMax) {
-      r.escaped = true;
-      this.rabbitsHerded++;
+    /* Down a hole? Only while it's running from him, and only if
+       one of the four corners is genuinely within reach. */
+    const fleeing = dist < FLEE_RADIUS;
+    const hole = fleeing
+      ? PADDOCK.holePoints.find(h =>
+          Phaser.Math.Distance.Between(r.spr.x, r.spr.y, h.x, h.y) < PADDOCK.holeReach)
+      : null;
 
-      /* Made bigger, brighter and slower after playtesting — the
-         original single small circle was easy to miss if he
-         wasn't looking right at it. A warm filled core plus an
-         expanding ring reads much more clearly against the grass. */
-      const px = r.spr.x, py = r.spr.y - 10;
+    if (hole) {
+      r.gone = true;
+      this.rabbitEscaped = true;
+
+      /* The same puff the old chase used when a rabbit crossed the
+         boundary, now going off at the mouth of the hole rather
+         than wherever it happened to leave the patch. Made big,
+         bright and slow after playtesting: one small circle was
+         easy to miss if he wasn't looking right at it. */
+      const px = hole.x, py = hole.y - 10;
       const puff = this.add.circle(px, py, 7, 0xfff6df, 0.92).setDepth(9500);
       const ring = this.add.circle(px, py, 4, 0xffffff, 0).setDepth(9501);
       ring.setStrokeStyle(3, 0xfff6df, 0.95);
@@ -7031,11 +7670,12 @@ class PrairieScene extends Phaser.Scene {
     }
   }
 
+  /* No count to keep any more, so the readout is just the clock and
+     a reminder of what he's doing. */
   updateChaseHUD() {
     const secs = Math.max(0, Math.ceil(this.chaseTimeLeft / 1000));
-    const left = 3 - this.rabbitsHerded;
     this.chaseText.setText(
-      'Herding rabbits — ' + left + ' left     0:' + String(secs).padStart(2, '0')
+      'After the rabbit!     0:' + String(secs).padStart(2, '0')
     );
     const b = this.chaseText.getBounds();
     this.chaseBox.setSize(b.width + 30, b.height + 18);
@@ -7047,7 +7687,7 @@ class PrairieScene extends Phaser.Scene {
      rather than reaching into the not-yet-built Park Points
      system: Henri knocks over the water can on his way back,
      which waters whatever's currently planted for free. */
-  endChase(won) {
+  endChase(won, why) {
     this.chaseActive = false;
     this.updatePlantButton();   // and hands it back afterwards
     this.chaseRabbits.forEach(r => {
@@ -7073,20 +7713,53 @@ class PrairieScene extends Phaser.Scene {
     this.henriChaseCooldown = pickChaseCooldown();
     this.actionVerbShown = null;   // so the button re-reads itself now that he's back in charge
 
+    /* The reward is unchanged, and is applied here rather than after
+       the walk home on purpose: the yard is rebuilt from scratch on
+       the way back in, and the beds are painted wet or dry from what
+       the save says at that moment. Watering first means they come
+       up already watered instead of flicking over a beat later. */
+    let watered = 0;
     if (won) {
-      let watered = 0;
       this.garden.plots.forEach(p => { if (p.seed && !p.watered) { p.watered = true; watered++; } });
       if (watered > 0) this.commitGarden();
-      this.toast(
-        'Henri herded all three rabbits out of the yard!' +
-        (watered > 0
-          ? ' He knocked over the watering can on the way back — free watering today.'
-          : ' Good boy, Henri.'),
-        3800
-      );
-    } else {
-      this.toast('The rabbits got away this time — Henri had fun anyway.', 3000);
     }
+
+    /* Out of the paddock and back to the exact spot in the yard he
+       set off from, behind the same short fade he came in on. There
+       is no doorway out of the pen, so this is the only way anyone
+       ever leaves it, which is rather the idea. */
+    const back = this.chaseReturn || { area: 'home', x: this.player.x, y: this.player.y };
+    this.chaseReturn = null;
+
+    this.transitioning = true;
+    this.cameras.main.fadeOut(180, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.enterArea(back.area, back.x, back.y);
+      this.cameras.main.fadeIn(220, 0, 0, 0);
+      this.time.delayedCall(230, () => {
+        this.transitioning = false;
+
+        /* Nothing is punished, win or lose, the same "kindness over
+           punishment" rule the garden runs on. A win gives one
+           small self-contained reward rather than reaching into the
+           not-yet-built Park Points system: Henri knocks the
+           watering can over on his way back, and everything planted
+           gets watered for free. */
+        if (won) {
+          this.toast(
+            'Henri ran the rabbit down!' +
+            (watered > 0
+              ? ' He knocked the watering can over on the way back, so the garden is watered today.'
+              : ' Good boy, Henri.'),
+            3800
+          );
+        } else if (why === 'hole') {
+          this.toast('The rabbit squeezed out through a hole in the corner. Henri had fun anyway.', 3200);
+        } else {
+          this.toast('The rabbit got away this time. Henri had fun anyway.', 3000);
+        }
+      });
+    });
   }
 }
 
